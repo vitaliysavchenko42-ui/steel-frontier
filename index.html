@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Стальной Рубеж — танковая аркада</title>
+<meta name="description" content="Браузерная танковая аркада с бесконечными уровнями. Собственный код и графика.">
+<link rel="stylesheet" href="css/style.css?v=1">
+</head>
+<body>
+<div id="stage">
+  <canvas id="game" width="448" height="496"></canvas>
+  <div id="touch" aria-hidden="true">
+    <div id="dpad">
+      <button class="tbtn" data-key="ArrowUp"    style="grid-area: u">▲</button>
+      <button class="tbtn" data-key="ArrowLeft"  style="grid-area: l">◀</button>
+      <button class="tbtn" data-key="ArrowRight" style="grid-area: r">▶</button>
+      <button class="tbtn" data-key="ArrowDown"  style="grid-area: d">▼</button>
+    </div>
+    <button id="fire" class="tbtn" data-key="Space">ОГОНЬ</button>
+  </div>
+  <p id="hint">Стрелки/WASD — движение · ПРОБЕЛ — огонь · P — пауза</p>
+</div>
+<script src="js/constants.js?v=1"></script>
+<script src="js/rng.js?v=1"></script>
+<script src="js/field.js?v=1"></script>
+<script src="js/mapgen.js?v=1"></script>
+<script src="js/engine.js?v=1"></script>
+<script src="js/ai.js?v=1"></script>
+<script src="js/game.js?v=1"></script>
+<script src="js/sound.js?v=1"></script>
+<script src="js/render.js?v=1"></script>
+<script src="js/ui.js?v=1"></script>
+<script src="js/main.js?v=1"></script>
+</body>
+</html>
