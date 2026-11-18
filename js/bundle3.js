@@ -126,10 +126,40 @@ function drawFlag(ctx, x, y, time){
 function drawBullet(ctx, b, player){
   const cx = b.x + b.w/2, cy = b.y + b.h/2;
   const [dx, dy] = DIRV[b.dir];
-  ctx.fillStyle = player ? '#ffe890' : '#ff9060';
-  ctx.fillRect(cx + dx * 2 - 2, cy + dy * 2 - 2, 4, 4);
-  ctx.fillStyle = 'rgba(255,255,220,0.5)';
-  ctx.fillRect(cx + dx * 5 - 1, cy + dy * 5 - 1, 2, 2);
+  ctx.fillStyle = player ? 'rgba(255,232,144,0.35)' : 'rgba(255,112,64,0.35)';
+  ctx.beginPath();
+  ctx.arc(cx - dx * 9, cy - dy * 9, 2.4, 0, 7); ctx.fill();
+  ctx.arc(cx - dx * 4.5, cy - dy * 4.5, 3.2, 0, 7); ctx.fill();
+  ctx.fillStyle = player ? '#ffe890' : '#ff7040';
+  ctx.beginPath(); ctx.arc(cx, cy, 3.6, 0, 7); ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath(); ctx.arc(cx + dx, cy + dy, 1.6, 0, 7); ctx.fill();
+}
+function drawSpawnStar(ctx, cx, cy, r, a){
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - r); ctx.lineTo(cx + r*0.25, cy - r*0.25);
+  ctx.lineTo(cx + r, cy); ctx.lineTo(cx + r*0.25, cy + r*0.25);
+  ctx.lineTo(cx, cy + r); ctx.lineTo(cx - r*0.25, cy + r*0.25);
+  ctx.lineTo(cx - r, cy); ctx.lineTo(cx - r*0.25, cy - r*0.25);
+  ctx.closePath(); ctx.fill();
+  ctx.globalAlpha = a * 0.55;
+  ctx.beginPath(); ctx.arc(cx, cy, r * 0.35, 0, 7); ctx.fill();
+  ctx.restore();
+}
+function drawSparkle(ctx, sp, time){
+  const p = (time - sp.t0) / sp.dur;
+  if (p < 0 || p > 1) return;
+  const a = 1 - p;
+  ctx.strokeStyle = 'rgba(255,240,180,' + a + ')';
+  ctx.lineWidth = 2;
+  const r = 2 + p * 7;
+  ctx.beginPath();
+  ctx.moveTo(sp.x - r, sp.y); ctx.lineTo(sp.x + r, sp.y);
+  ctx.moveTo(sp.x, sp.y - r); ctx.lineTo(sp.x, sp.y + r);
+  ctx.stroke();
 }
 function drawBonus(ctx, b, time){
   const bob = Math.sin(time * 5) * 2;
@@ -214,16 +244,12 @@ function drawField(ctx, game, time){
   }
   for (const t of game.engine.tanks){
     if (!t.alive) continue;
-    if (t.spawnFlash > 0){
-      if (Math.sin(time * 20) > 0){
-        ctx.strokeStyle = 'rgba(255,255,255,0.9)';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(OFF_X + t.x - 2, OFF_Y + t.y - 2, TANK + 4, TANK + 4);
-      }
-      continue;
-    }
     drawTank(ctx, OFF_X + t.x + TANK/2, OFF_Y + t.y + TANK/2, t.dir,
       t.isPlayer ? 'player' : (t.elite && Math.sin(time * 12) > 0 ? 'gold' : (ENEMY_COLOR[t.type] || 'grey')), t);
+    if (t.spawnFlash > 0){
+      const a = 0.35 + 0.4 * (0.5 + 0.5 * Math.sin(time * 16));
+      drawSpawnStar(ctx, OFF_X + t.x + TANK/2, OFF_Y + t.y + TANK/2, 11 + 3 * Math.sin(time * 12), a);
+    }
     if (t.shield > 0){
       const a = 0.4 + 0.3 * Math.sin(time * 10);
       ctx.strokeStyle = 'rgba(120,220,255,' + a + ')';
@@ -233,6 +259,7 @@ function drawField(ctx, game, time){
   }
   for (const b of game.engine.bullets) drawBullet(ctx, b, b.fromPlayer);
   for (const ex of game.explosions || []) drawExplosion(ctx, ex, time);
+  for (const sp of game.sparkles || []) drawSparkle(ctx, sp, time);
   for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++)
     if (tiles[y][x] === T.FOREST) drawForestTile(ctx, OFF_X + x * CELL, OFF_Y + y * CELL);
 }
@@ -505,19 +532,12 @@ class UI {
     this.game = null;
     this.pendingStats = null;
   }
-  spawnFx(x, y, big){
-    if (!this.game) return;
-    this.game.explosions.push({ x: 16 + x + 16, y: 56 + y + 16, t0: this.time, dur: big ? 0.7 : 0.4, big, seed: Math.random() * 6 });
-    if (this.sfx.explosion) this.sfx.explosion(big);
-  }
   startGame(level){
     const G = C.Game;
     this.game = new G(level, {
       onSound: (name) => { if (this.sfx[name]) this.sfx[name](); },
       onEvent: () => {},
     });
-    this.game.explosions = [];
-    this.game.onEvent = (type, x, y) => { if (type === 'explosion') this.spawnFx(x, y, true); };
     this.mode = 'playing';
     if (this.sfx.playTheme) this.sfx.playTheme();
   }
@@ -572,9 +592,6 @@ class UI {
   }
   update(dt, keys){
     this.time += dt;
-    if (this.game && this.game.explosions){
-      this.game.explosions = this.game.explosions.filter(e => (this.time - e.t0) < e.dur);
-    }
   }
   render(){
     const ctx = this.ctx;
@@ -583,8 +600,8 @@ class UI {
     else if (this.mode === 'levelSelect') R.drawLevelSelect(ctx, this.menu, this.time);
     else if (this.mode === 'playing' || this.mode === 'paused'){
       const g = this.game;
-      R.drawField(ctx, g, this.time);
-      R.drawHUD(ctx, g, this.time);
+      R.drawField(ctx, g, g.time);
+      R.drawHUD(ctx, g, g.time);
       if (this.mode === 'paused') R.drawPause(ctx, this.time);
       if (g.state === 'won' && !g.statsShown){
         g.statsShown = true;
