@@ -21,6 +21,7 @@ class Engine {
     this.tiles = tiles.map(r => r.slice());
     this.tanks = []; this.bullets = []; this.effects = [];
     this.time = 0; this.bonuses = []; this.stats = { kills: 0, score: 0 };
+    this.onShot = null; this.onHit = null; this.onClash = null; this.onDeath = null;
   }
   addTank(o){
     const tank = Object.assign({
@@ -83,6 +84,7 @@ class Engine {
       owner: tank, power: tank.power || 1, alive: true, fromPlayer: tank.isPlayer };
     this.bullets.push(bullet);
     tank.bulletsAlive++;
+    if (this.onShot) this.onShot(tank);
     return bullet;
   }
   damageTile(tx, ty, power, b){
@@ -132,6 +134,17 @@ class Engine {
       for (let s = 0; s < steps && b.alive; s++){
         b.x += dx * sd; b.y += dy * sd;
         if (b.x < 0 || b.y < 0 || b.x + b.w > W || b.y + b.h > H){ b.alive = false; break; }
+        // столкновение пуль на каждом подшаге — иначе пули проскакивают друг мимо друга
+        for (const o of this.bullets){
+          if (o === b || !o.alive) continue;
+          if (b.fromPlayer !== o.fromPlayer &&
+              b.x < o.x + o.w && b.x + b.w > o.x && b.y < o.y + o.h && b.y + b.h > o.y){
+            b.alive = false; o.alive = false;
+            if (this.onClash) this.onClash(b.x + b.w/2, b.y + b.h/2);
+            break;
+          }
+        }
+        if (!b.alive) break;
         const hit = rectHitsTiles(b.x, b.y, b.w, b.h, this.tiles, SOLID_FOR_BULLET);
         if (hit){
           this.damageTile(hit.tx, hit.ty, b.power, b);
@@ -139,16 +152,9 @@ class Engine {
             const [ox, oy] = dx !== 0 ? [0, 1] : [1, 0];
             this.damageTile(hit.tx + ox, hit.ty + oy, b.power, b);
           }
+          if (this.onHit) this.onHit(b.x + b.w/2, b.y + b.h/2, 'wall');
           b.alive = false; break;
         }
-        for (const o of this.bullets){
-          if (o === b || !o.alive) continue;
-          if (b.fromPlayer !== o.fromPlayer &&
-              b.x < o.x + o.w && b.x + b.w > o.x && b.y < o.y + o.h && b.y + b.h > o.y){
-            b.alive = false; o.alive = false; break;
-          }
-        }
-        if (!b.alive) break;
         for (const t of this.tanks){
           if (!t.alive || t === b.owner) continue;
           if (!b.fromPlayer && !t.isPlayer) continue;
@@ -158,7 +164,8 @@ class Engine {
             if (t.hp <= 0){
               t.alive = false;
               if (!t.isPlayer){ this.stats.kills++; this.stats.score += ENEMY_SCORE[t.type] || 100; }
-            }
+              if (this.onDeath) this.onDeath(t);
+            } else if (this.onHit) this.onHit(b.x + b.w/2, b.y + b.h/2, 'tank');
             b.alive = false; break;
           }
         }
@@ -324,7 +331,24 @@ class Game {
     this.freezeTimer = 0;
     this.stats = { kills:0, score:0, bonuses:0, time:0 };
     this.playerPower = 1;
+    this.explosions = [];
+    this.sparkles = [];
     this.startLevel();
+    const E = this.engine;
+    E.onShot = (tank) => this.onSound('shoot', !!tank.isPlayer);
+    E.onHit = (x, y, kind) => {
+      if (kind === 'steel') this.onSound('ricochet');
+      this.sparkles.push({ x: 16 + x, y: 56 + y, t0: this.time, dur: 0.28 });
+    };
+    E.onClash = (x, y) => {
+      this.onSound('ricochet');
+      this.sparkles.push({ x: 16 + x, y: 56 + y, t0: this.time, dur: 0.35 });
+    };
+    E.onDeath = (t) => {
+      this.explosions.push({ x: 16 + t.x + 16, y: 56 + t.y + 16, t0: this.time,
+        dur: t.isPlayer ? 0.9 : 0.55, big: t.isPlayer || t.type === 'armor', seed: Math.random() * 6 });
+      if (!t.isPlayer) this.onSound('explosion', false);
+    };
   }
   startLevel(){
     const m = C.MapGen.generateMap(this.level);
@@ -465,6 +489,8 @@ class Game {
   step(dt, input){
     if (this.state !== 'playing') return;
     this.time += dt; this.levelTime += dt;
+    this.explosions = this.explosions.filter(e => this.time - e.t0 < e.dur);
+    this.sparkles = this.sparkles.filter(e => this.time - e.t0 < e.dur);
     const w = this.engine;
     this.enemiesOnField = w.tanks.filter(t => !t.isPlayer && t.alive).length;
     if (this.enemiesRemaining > 0 && this.enemiesOnField < this.budget.maxOn){
