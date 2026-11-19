@@ -3,7 +3,7 @@
 "use strict";
 const C = window.__TANKS__;
 const { CELL, TANK, COLS, ROWS, W, H, T, DIR, DIRV, BIG, FLAG } = C;
-const SNAP = BIG;
+const SNAP = 16; // полклетки: повороты и остановки шагом 16px (половина танка)
 
 function rectHitsTiles(x, y, w, h, tiles, predicate){
   const x1 = Math.max(0, Math.floor(x / CELL)), y1 = Math.max(0, Math.floor(y / CELL));
@@ -194,7 +194,7 @@ if (typeof window !== 'undefined') Object.assign(window.__TANKS__, { Engine });
 "use strict";
 const C = window.__TANKS__;
 const { DIR, DIRV, CELL, TANK, T, BG } = C;
-const { computeField } = C;
+const { computeField, computeFieldTo } = C;
 const rand = () => Math.random();
 function bigCell(px){ return Math.min(BG-1, Math.max(0, Math.ceil((px + TANK/2) / (CELL*2)) - 1)); }
 function centerOfBig(cx, cy){ return { x: cx*CELL*2, y: cy*CELL*2 }; }
@@ -204,13 +204,16 @@ class EnemyAI {
     this.world = world; this.tank = tank;
     this.basePos = basePos || [6, 11];
     this.p = Object.assign({ fireMul: 1, attackOnSight: 3.0 }, params || {});
-    this.dist = computeField(this.world.tiles);
+    // подходная точка: враги идут к штабу разными дорогами
+    this.approach = this.p.approach || null;
+    this.spread = 1 + rand() * 2;
+    this.dist = this.approach ? computeFieldTo(this.world.tiles, this.approach) : computeField(this.world.tiles);
     this.goal = null;
     this.attackT = 0;
     this.replanCd = 2 + rand();
     this.stuck = 0; this.lastX = tank.x; this.lastY = tank.y;
   }
-  refreshField(){ this.dist = computeField(this.world.tiles); }
+  refreshField(){ this.dist = this.approach ? computeFieldTo(this.world.tiles, this.approach) : computeField(this.world.tiles); }
   cellFree(bx, by){
     for (let sy = 0; sy < 2; sy++) for (let sx = 0; sx < 2; sx++){
       const v = this.world.tiles[by*2+sy][bx*2+sx];
@@ -233,6 +236,10 @@ class EnemyAI {
     }
     if (best === null || bestD === Infinity){
       best = pool.length ? pool[Math.floor(rand() * pool.length)] : { cx, cy };
+    } else {
+      // «разъезд»: иногда выбираем не самый короткий путь, а один из почти равных
+      const near = pool.filter(c => this.dist[c.cy][c.cx] <= bestD + this.spread);
+      if (near.length > 1 && rand() < 0.45) best = near[Math.floor(rand() * near.length)];
     }
     this.goal = best;
   }
@@ -322,6 +329,8 @@ const { makeRng } = C;
 const BONUS_TYPES = ['grenade','helmet','star','shovel','tank','clock'];
 const SPAWN_INTERVAL = 10; // секунд между гибелью врага и появлением замены
 const BONUS_LIFE = 30;     // сколько секунд бонус живёт на поле
+// разные «подходы» к штабу — враги не едут колонной друг за другом
+const APPROACHES = [[6,11],[5,10],[7,10],[4,11],[8,11],[6,9]];
 
 class Game {
   constructor(level, opts){
@@ -420,7 +429,8 @@ class Game {
       fireRate: spec.fireRate, elite: spec.elite, bonusDrop: spec.elite,
       spawnFlash: 2.0, maxBullets: spec.type === 'sniper' ? 2 : 1,
     });
-    const ai = new EnemyAI(this.engine, tank, BASE_CELL, { fireMul: this.budget.fireMul });
+    const approach = APPROACHES[Math.floor(this.rng.next() * APPROACHES.length)];
+    const ai = new EnemyAI(this.engine, tank, BASE_CELL, { fireMul: this.budget.fireMul, approach });
     this.enemyAis.set(tank, ai);
     this.enemiesOnField++;
     this.onSound('spawn');
@@ -444,8 +454,11 @@ class Game {
             this.engine.stats.kills++;
             this.onEvent('explosion', t.x, t.y);
             this.respawnQueue.push(this.time);
+            // взрыв на месте каждого врага, снесённого гранатой
+            this.explosions.push({ x: 16 + t.x + 16, y: 56 + t.y + 16, t0: this.time, dur: 0.8, big: true, seed: Math.random() * 6 });
           }
         }
+        this.onSound('explosion', true);
         break;
       }
       case 'helmet': p.shield = Math.max(p.shield, 10); break;
@@ -584,7 +597,7 @@ if (typeof window !== 'undefined') Object.assign(window.__TANKS__, { Game, BONUS
 /* ===== sound.js ===== */
 (function(){
 "use strict";
-const VOICE_LIMIT = 6;
+const VOICE_LIMIT = 8;
 class SFX {
   constructor(){
     this.ctx = null; this.master = null;
@@ -651,11 +664,13 @@ class SFX {
     o.start(t); o.stop(t + dur);
     o.onended = () => { this.activeVoices--; };
   }
-  shoot(player){ this.playTone(player ? 520 : 380, 0.08, 'square', 0.15, 120); this.playNoise(0.06, 4000, 800, 0.12); }
+  shoot(player){ this.playTone(player ? 560 : 420, 0.14, 'square', 0.28, 90); this.playNoise(0.10, 5000, 500, 0.30); this.playTone(player ? 170 : 130, 0.11, 'triangle', 0.20, 55); }
   ricochet(){ this.playTone(900, 0.05, 'triangle', 0.1, 500); }
   explosion(big){
-    this.playNoise(big ? 0.6 : 0.3, big ? 900 : 1600, 60, big ? 0.5 : 0.3);
-    this.playTone(big ? 70 : 110, big ? 0.5 : 0.25, 'sawtooth', 0.25, 30);
+    // громкий слоёный взрыв: крах + низкий гул + подкат
+    this.playNoise(big ? 0.9 : 0.5, big ? 1200 : 2200, 50, big ? 0.85 : 0.6);
+    this.playTone(big ? 55 : 95, big ? 0.85 : 0.45, 'sawtooth', big ? 0.5 : 0.4, 22);
+    this.playNoise(0.3, 400, 45, 0.45);
   }
   bonus(){ const n = [523, 659, 784, 1047]; n.forEach((f, i) => setTimeout(() => this.playTone(f, 0.12, 'square', 0.18), i * 70)); }
   spawn(){ this.playTone(220, 0.15, 'sawtooth', 0.08, 440); }
