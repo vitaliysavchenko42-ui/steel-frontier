@@ -12,7 +12,7 @@ const MapGen = typeof require !== 'undefined' && typeof window === 'undefined'
   ? require('./mapgen') : window.__TANKS__.MapGen;
 
 const BONUS_TYPES = ['grenade','helmet','star','shovel','tank','clock'];
-const SPAWN_INTERVAL = 10; // секунд между гибелью врага и появлением замены
+const SPAWN_INTERVAL = 5; // секунд между гибелью врага и появлением замены
 const BONUS_LIFE = 30;     // сколько секунд бонус живёт на поле
 // разные «подходы» к штабу — враги не едут колонной друг за другом
 const APPROACHES = [[6,11],[5,10],[7,10],[4,11],[8,11],[6,9]];
@@ -32,6 +32,7 @@ class Game {
     this.spawnQueue = [];
     this.enemiesOnField = 0;
     this.enemyAis = new Map();
+    this.spawnIdx = 0; // последовательный обход точек спавна
     this.respawnQueue = []; // моменты гибели врагов: замена через SPAWN_INTERVAL
     this.baseShovel = 0;
     this.freezeTimer = 0;
@@ -69,8 +70,10 @@ class Game {
     const [px, py] = cellPx(PLAYER_CELL[0], PLAYER_CELL[1]);
     this.player = this.engine.addTank({
       x: px, y: py, dir: DIR.UP, isPlayer: true,
-      speed: 46, hp: 1, shield: 3.5, bulletSpeed: 150,
+      speed: 46, hp: 1, shield: 3.5,
+      bulletSpeed: this.playerPower >= 4 ? 220 : (this.playerPower >= 2 ? 195 : 150),
       fireRate: 0.42, power: this.playerPower,
+      maxBullets: this.playerPower >= 3 ? 2 : 1,
     });
     const b = this.budget;
     this.spawnQueue = [];
@@ -94,17 +97,17 @@ class Game {
     for (let s = 0; s < 3; s++) if (this.spawnEnemy()) spawnedNow++;
     this.enemiesRemaining -= spawnedNow;
   }
-  freeEnemyCell(){
-    const cells = ENEMY_CELLS.slice().sort(() => this.rng.next() - 0.5);
-    for (const [cx, cy] of cells){
-      const [x, y] = cellPx(cx, cy);
-      const occupied = this.engine.tanks.some(t => t.alive && Math.abs(t.x - x) < 40 && Math.abs(t.y - y) < 40);
-      if (!occupied) return { x, y, cx, cy };
-    }
-    return null;
+  nextEnemyCell(){
+    // строго последовательный порядок: замена выходит только на следующую точку по кругу
+    const idx = this.spawnIdx % ENEMY_CELLS.length;
+    const [cx, cy] = ENEMY_CELLS[idx];
+    const [x, y] = cellPx(cx, cy);
+    const occupied = this.engine.tanks.some(t => t.alive && Math.abs(t.x - x) < 40 && Math.abs(t.y - y) < 40);
+    if (occupied) return null;
+    return { x, y, cx, cy, idx };
   }
   spawnEnemy(){
-    const spot = this.freeEnemyCell();
+    const spot = this.nextEnemyCell();
     if (!spot) return false;
     const spec = this.spawnQueue.shift();
     const t = ENEMY_TYPES[spec.type];
@@ -115,6 +118,7 @@ class Game {
       spawnFlash: 2.0, maxBullets: spec.type === 'sniper' ? 2 : 1,
     });
     const approach = APPROACHES[Math.floor(this.rng.next() * APPROACHES.length)];
+    this.spawnIdx = (spot.idx + 1) % ENEMY_CELLS.length;
     const ai = new EnemyAI(this.engine, tank, BASE_CELL, { fireMul: this.budget.fireMul, approach });
     this.enemyAis.set(tank, ai);
     this.enemiesOnField++;
@@ -148,9 +152,12 @@ class Game {
       }
       case 'helmet': p.shield = Math.max(p.shield, 10); break;
       case 'star': {
-        p.power = Math.min(3, (p.power || 1) + 1);
-        if (p.power >= 2) p.maxBullets = 2;
-        if (p.power >= 3) p.bulletSpeed = 220;
+        // шкала: 1 звезда — пули +30%; 2 звезды — две пули; 3 звезды — бронебой
+        p.power = Math.min(4, (p.power || 1) + 1);
+        if (p.power >= 2) p.bulletSpeed = Math.round(150 * 1.3); // 195
+        if (p.power >= 3) p.maxBullets = 2;
+        if (p.power >= 4) p.bulletSpeed = 220;
+        this.playerPower = p.power;
         break;
       }
       case 'shovel': {
@@ -201,9 +208,10 @@ class Game {
     const [px, py] = cellPx(PLAYER_CELL[0], PLAYER_CELL[1]);
     this.player = this.engine.addTank({
       x: px, y: py, dir: DIR.UP, isPlayer: true,
-      speed: 46, hp: 1, shield: 3.5, bulletSpeed: this.playerPower >= 3 ? 220 : 150,
+      speed: 46, hp: 1, shield: 3.5,
+      bulletSpeed: this.playerPower >= 4 ? 220 : (this.playerPower >= 2 ? 195 : 150),
       fireRate: 0.42, power: this.playerPower,
-      maxBullets: this.playerPower >= 2 ? 2 : 1,
+      maxBullets: this.playerPower >= 3 ? 2 : 1,
     });
   }
   step(dt, input){
