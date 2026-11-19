@@ -158,49 +158,80 @@ function drawSparkle(ctx, sp, time){
   ctx.moveTo(sp.x, sp.y - r); ctx.lineTo(sp.x, sp.y + r);
   ctx.stroke();
 }
+const BONUS_ICONS = {
+  grenade: '#9ccc3d', helmet: '#4fc3f7', star: '#ffe082',
+  shovel: '#cfd8dc', tank: '#66bb6a', clock: '#f5f5f5',
+};
 function drawBonus(ctx, b, time){
   const age = time - (b.t0 === undefined ? 0 : b.t0);
   if (age > 27) { if ((time * 8) % 1 < 0.5) return; }      // финальное быстрое мигание
   else if (age > 22) { if ((time * 4) % 1 < 0.5) return; } // предсмертное мигание
   const bob = Math.sin(time * 5) * 2;
   const x = OFF_X + b.x, y = OFF_Y + b.y + bob;
-  ctx.fillStyle = 'rgba(20,20,26,0.85)';
-  roundRect(ctx, x, y, b.w, b.h, 4); ctx.fill();
-  ctx.strokeStyle = '#e8c840'; ctx.lineWidth = 2;
-  roundRect(ctx, x + 1, y + 1, b.w - 2, b.h - 2, 3); ctx.stroke();
-  ctx.fillStyle = '#ffd840';
   const cx = x + b.w/2, cy = y + b.h/2;
+  const pulse = 0.5 + 0.5 * Math.sin(time * 4);
+  const col = BONUS_ICONS[b.type] || '#ffe082';
+  ctx.fillStyle = 'rgba(255,220,90,' + (0.08 + 0.13 * pulse) + ')';
+  ctx.beginPath(); ctx.arc(cx, cy, 20 + pulse * 4, 0, 7); ctx.fill();
+  ctx.fillStyle = 'rgba(255,235,150,' + (0.13 + 0.17 * pulse) + ')';
+  ctx.beginPath(); ctx.arc(cx, cy, 13.5, 0, 7); ctx.fill();
+  ctx.fillStyle = 'rgba(255,240,170,0.95)';
+  for (let i = 0; i < 3; i++){
+    const a2 = time * 2.6 + i * 2.1;
+    const rr2 = 15.5 + Math.sin(time * 6 + i * 1.9) * 2.5;
+    const sx = cx + Math.cos(a2) * rr2;
+    const sy = cy + Math.sin(a2 * 0.83) * rr2 * 0.75;
+    const tw = 1.1 + 1.2 * (0.5 + 0.5 * Math.sin(time * 9 + i * 2.4));
+    ctx.beginPath(); ctx.arc(sx, sy, tw, 0, 7); ctx.fill();
+  }
+  ctx.fillStyle = 'rgba(14,14,20,0.92)';
+  roundRect(ctx, x, y, b.w, b.h, 5); ctx.fill();
+  ctx.strokeStyle = col; ctx.lineWidth = 2;
+  roundRect(ctx, x + 1, y + 1, b.w - 2, b.h - 2, 4); ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1;
+  roundRect(ctx, x + 3, y + 3, b.w - 6, b.h - 6, 2.5); ctx.stroke();
+  ctx.fillStyle = col;
   switch(b.type){
     case 'grenade':
-      ctx.beginPath(); ctx.arc(cx, cy + 1, 5, 0, 7); ctx.fill();
-      ctx.fillRect(cx - 1, cy - 8, 4, 5);
+      ctx.beginPath(); ctx.arc(cx, cy + 1, 5.2, 0, 7); ctx.fill();
+      ctx.fillRect(cx - 1.5, cy - 8.5, 4, 4.5);
+      ctx.fillStyle = '#ff5252';
+      ctx.fillRect(cx - 1, cy - 10, 2.5, 2.5);
       break;
     case 'helmet':
-      ctx.beginPath(); ctx.arc(cx, cy + 2, 6, Math.PI, 0); ctx.fill();
-      ctx.fillRect(cx - 7, cy + 1, 14, 3);
+      ctx.beginPath(); ctx.arc(cx, cy + 2, 6.2, Math.PI, 0); ctx.fill();
+      ctx.fillRect(cx - 7.5, cy + 1, 15, 3);
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      ctx.beginPath(); ctx.arc(cx - 2, cy - 1.5, 2.2, 0, 7); ctx.fill();
       break;
     case 'star':
       ctx.beginPath();
       for (let i = 0; i < 10; i++){
-        const r = i % 2 ? 3 : 7;
+        const r = i % 2 ? 3.2 : 7.4;
         const a = -Math.PI/2 + i * Math.PI/5;
         ctx[i ? 'lineTo' : 'moveTo'](cx + Math.cos(a) * r, cy + Math.sin(a) * r);
       }
       ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#fff8dc';
+      ctx.beginPath(); ctx.arc(cx, cy, 2.2, 0, 7); ctx.fill();
       break;
     case 'shovel':
-      ctx.fillRect(cx - 1, cy - 6, 3, 8);
-      ctx.beginPath(); ctx.moveTo(cx - 4, cy + 2); ctx.lineTo(cx + 5, cy + 2); ctx.lineTo(cx + 0.5, cy + 8); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#a1887f';
+      ctx.fillRect(cx - 1.5, cy - 7, 3, 7.5);
+      ctx.fillStyle = '#cfd8dc';
+      ctx.beginPath(); ctx.moveTo(cx - 4.5, cy + 0.5); ctx.lineTo(cx + 5.5, cy + 0.5); ctx.lineTo(cx + 0.5, cy + 8.5); ctx.closePath(); ctx.fill();
       break;
     case 'tank':
-      ctx.fillRect(cx - 6, cy - 3, 12, 6);
-      ctx.fillRect(cx - 2, cy - 6, 5, 4);
+      ctx.fillRect(cx - 6.5, cy - 3, 13, 6);
+      ctx.fillRect(cx - 2.5, cy - 6.5, 6, 4.5);
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.fillRect(cx - 5, cy - 1.5, 10, 1.5);
       break;
     case 'clock':
-      ctx.beginPath(); ctx.arc(cx, cy, 6, 0, 7); ctx.fill();
-      ctx.strokeStyle = '#333'; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx, cy - 4); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + 3, cy); ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx, cy, 6.4, 0, 7); ctx.fill();
+      ctx.strokeStyle = '#37474f'; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx, cy - 4.2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + 3.4, cy); ctx.stroke();
       break;
   }
 }
@@ -209,13 +240,11 @@ function drawExplosion(ctx, ex, time){
   if (p < 0 || p > 1) return;
   const a = 1 - p;
   const r = 8 + p * (ex.big ? 36 : 20);
-  // яркая вспышка в начале
   if (p < 0.35){
     const fa = 1 - p / 0.35;
     ctx.fillStyle = 'rgba(255,255,215,' + (fa * 0.95) + ')';
     ctx.beginPath(); ctx.arc(ex.x, ex.y, r * (0.55 + 0.45 * (1 - p / 0.35)), 0, 7); ctx.fill();
   }
-  // огненные лепестки
   const petals = ex.big ? 10 : 6;
   for (let i = 0; i < petals; i++){
     const ang = i * Math.PI / (petals / 2) + ex.seed;
@@ -225,11 +254,9 @@ function drawExplosion(ctx, ex, time){
     ctx.arc(ex.x + Math.cos(ang) * rr * (0.3 + p), ex.y + Math.sin(ang) * rr * (0.3 + p), (4.5 * (1 - p) + 2) * (ex.big ? 1.2 : 1), 0, 7);
     ctx.fill();
   }
-  // расширяющееся кольцо ударной волны
   ctx.strokeStyle = 'rgba(255,205,90,' + (a * 0.75) + ')';
   ctx.lineWidth = 3.5 * (1 - p) + 0.8;
   ctx.beginPath(); ctx.arc(ex.x, ex.y, r * 1.15, 0, 7); ctx.stroke();
-  // осколки, разлетающиеся наружу
   const shards = ex.big ? 12 : 8;
   for (let i = 0; i < shards; i++){
     const ang = i * 2 * Math.PI / shards + ex.seed * 1.7;
