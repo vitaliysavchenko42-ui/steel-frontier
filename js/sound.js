@@ -1,5 +1,5 @@
 "use strict";
-const VOICE_LIMIT = 6;
+const VOICE_LIMIT = 8;
 class SFX {
   constructor(){
     this.ctx = null; this.master = null;
@@ -66,11 +66,13 @@ class SFX {
     o.start(t); o.stop(t + dur);
     o.onended = () => { this.activeVoices--; };
   }
-  shoot(player){ this.playTone(player ? 520 : 380, 0.08, 'square', 0.15, 120); this.playNoise(0.06, 4000, 800, 0.12); }
+  shoot(player){ this.playTone(player ? 560 : 420, 0.14, 'square', 0.28, 90); this.playNoise(0.10, 5000, 500, 0.30); this.playTone(player ? 170 : 130, 0.11, 'triangle', 0.20, 55); }
   ricochet(){ this.playTone(900, 0.05, 'triangle', 0.1, 500); }
   explosion(big){
-    this.playNoise(big ? 0.6 : 0.3, big ? 900 : 1600, 60, big ? 0.5 : 0.3);
-    this.playTone(big ? 70 : 110, big ? 0.5 : 0.25, 'sawtooth', 0.25, 30);
+    // громкий слоёный взрыв: крах + низкий гул + подкат
+    this.playNoise(big ? 0.9 : 0.5, big ? 1200 : 2200, 50, big ? 0.85 : 0.6);
+    this.playTone(big ? 55 : 95, big ? 0.85 : 0.45, 'sawtooth', big ? 0.5 : 0.4, 22);
+    this.playNoise(0.3, 400, 45, 0.45);
   }
   bonus(){ const n = [523, 659, 784, 1047]; n.forEach((f, i) => setTimeout(() => this.playTone(f, 0.12, 'square', 0.18), i * 70)); }
   spawn(){ this.playTone(220, 0.15, 'sawtooth', 0.08, 440); }
