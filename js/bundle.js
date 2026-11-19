@@ -1,5 +1,5 @@
 "use strict";
-// Стальной Рубеж: bundle всех модулей (каждый в своей IIFE-области).
+// Стальной Рубеж: bundle собран из модулей (каждый в своей IIFE-обёртке).
 window.__TANKS__ = window.__TANKS__ || {};
 
 /* ===== constants.js ===== */
@@ -11,7 +11,7 @@ const COLS = 26, ROWS = 26;
 const W = COLS * CELL, H = ROWS * CELL;
 const BG = 13;
 const BIG = 32;
-const T = { EMPTY:0, BRICK:1, STEEL:2, WATER:3, FOREST:4, ICE:5, FLAG:6, BASEWALL:7 };
+const T = { EMPTY:0, BRICK:1, STEEL:2, WATER:3, FOREST:4, ICE:5, FLAG:6, BASEWALL:7, FLAGDEAD:8 };
 const DIR = { UP:0, RIGHT:1, DOWN:2, LEFT:3 };
 const DIRV = [[0,-1],[1,0],[0,1],[-1,0]];
 const ENEMY_CELLS = [[1,1],[6,1],[11,1]];
@@ -27,7 +27,7 @@ const ENEMY_TYPES = {
 };
 function enemyBudget(level){
   const total = 20 + Math.floor((level-1)/2);
-  const maxOn = Math.min(6, 4 + Math.floor((level-1)/4));
+  const maxOn = 3; // на поле всегда ровно три врага
   let pArmor = Math.min(0.35, 0.04 + (level-1)*0.03);
   let pSniper = Math.min(0.25, (level-1)*0.02);
   let pFast = Math.min(0.40, 0.12 + (level-1)*0.02);
