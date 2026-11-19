@@ -2,7 +2,7 @@
 const C = typeof require !== 'undefined' && typeof window === 'undefined'
   ? require('./constants') : window.__TANKS__;
 const { DIR, DIRV, CELL, TANK, T, BG } = C;
-const { computeField } = typeof require !== 'undefined' && typeof window === 'undefined'
+const { computeField, computeFieldTo } = typeof require !== 'undefined' && typeof window === 'undefined'
   ? require('./field') : window.__TANKS__;
 const rand = () => Math.random();
 function bigCell(px){ return Math.min(BG-1, Math.max(0, Math.ceil((px + TANK/2) / (CELL*2)) - 1)); }
@@ -13,13 +13,16 @@ class EnemyAI {
     this.world = world; this.tank = tank;
     this.basePos = basePos || [6, 11];
     this.p = Object.assign({ fireMul: 1, attackOnSight: 3.0 }, params || {});
-    this.dist = computeField(this.world.tiles);
+    // подходная точка: враги идут к штабу разными дорогами
+    this.approach = this.p.approach || null;
+    this.spread = 1 + rand() * 2;
+    this.dist = this.approach ? computeFieldTo(this.world.tiles, this.approach) : computeField(this.world.tiles);
     this.goal = null;
     this.attackT = 0;
     this.replanCd = 2 + rand();
     this.stuck = 0; this.lastX = tank.x; this.lastY = tank.y;
   }
-  refreshField(){ this.dist = computeField(this.world.tiles); }
+  refreshField(){ this.dist = this.approach ? computeFieldTo(this.world.tiles, this.approach) : computeField(this.world.tiles); }
   cellFree(bx, by){
     for (let sy = 0; sy < 2; sy++) for (let sx = 0; sx < 2; sx++){
       const v = this.world.tiles[by*2+sy][bx*2+sx];
@@ -42,6 +45,10 @@ class EnemyAI {
     }
     if (best === null || bestD === Infinity){
       best = pool.length ? pool[Math.floor(rand() * pool.length)] : { cx, cy };
+    } else {
+      // «разъезд»: иногда выбираем не самый короткий путь, а один из почти равных
+      const near = pool.filter(c => this.dist[c.cy][c.cx] <= bestD + this.spread);
+      if (near.length > 1 && rand() < 0.45) best = near[Math.floor(rand() * near.length)];
     }
     this.goal = best;
   }

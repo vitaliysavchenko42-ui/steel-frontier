@@ -2,7 +2,7 @@
 const C = typeof require !== 'undefined' && typeof window === 'undefined'
   ? require('./constants') : window.__TANKS__;
 const { CELL, TANK, COLS, ROWS, W, H, T, DIR, DIRV, BIG, FLAG } = C;
-const SNAP = BIG;
+const SNAP = 16; // полклетки: повороты и остановки шагом 16px (половина танка)
 
 function rectHitsTiles(x, y, w, h, tiles, predicate){
   const x1 = Math.max(0, Math.floor(x / CELL)), y1 = Math.max(0, Math.floor(y / CELL));
