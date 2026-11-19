@@ -1,9 +1,8 @@
-
 /* ===== engine.js ===== */
 (function(){
 "use strict";
 const C = window.__TANKS__;
-const { CELL, TANK, COLS, ROWS, W, H, T, DIR, DIRV, BIG } = C;
+const { CELL, TANK, COLS, ROWS, W, H, T, DIR, DIRV, BIG, FLAG } = C;
 const SNAP = BIG;
 
 function rectHitsTiles(x, y, w, h, tiles, predicate){
@@ -14,7 +13,7 @@ function rectHitsTiles(x, y, w, h, tiles, predicate){
   return null;
 }
 const SOLID_FOR_TANK = (v) => v === T.BRICK || v === T.STEEL || v === T.WATER;
-const SOLID_FOR_BULLET = (v) => v === T.BRICK || v === T.STEEL;
+const SOLID_FOR_BULLET = (v) => v === T.BRICK || v === T.STEEL || v === T.FLAG;
 
 class Engine {
   constructor(tiles){
@@ -78,8 +77,12 @@ class Engine {
     tank.fireCd = tank.fireRate;
     const [dx, dy] = DIRV[tank.dir];
     const bw = 6;
-    const bx = tank.x + TANK/2 - bw/2 + dx * (TANK/2);
-    const by = tank.y + TANK/2 - bw/2 + dy * (TANK/2);
+    // пуля вылетает с кончика ствола (дуло выступает на 3px за корпус)
+    const nose = TANK/2 + 4;
+    let bx = tank.x + TANK/2 - bw/2 + dx * nose;
+    let by = tank.y + TANK/2 - bw/2 + dy * nose;
+    bx = Math.min(W - bw, Math.max(0, bx));
+    by = Math.min(H - bw, Math.max(0, by));
     const bullet = { x: bx, y: by, w: bw, h: bw, dir: tank.dir, speed: tank.bulletSpeed,
       owner: tank, power: tank.power || 1, alive: true, fromPlayer: tank.isPlayer };
     this.bullets.push(bullet);
@@ -115,6 +118,12 @@ class Engine {
         return true;
       } return false;
     }
+    if (v === T.FLAG) {
+      // попадание в штаб: флаг уничтожен целиком
+      for (let fy = FLAG[1]; fy <= FLAG[3]; fy++) for (let fx2 = FLAG[0]; fx2 <= FLAG[2]; fx2++)
+        if (this.tiles[fy][fx2] === T.FLAG) this.tiles[fy][fx2] = T.FLAGDEAD;
+      return true;
+    }
     return false;
   }
   hitFlag(){ return this.tiles.some((row, y) => row.some((v, x) => v === T.FLAG)); }
@@ -147,12 +156,13 @@ class Engine {
         if (!b.alive) break;
         const hit = rectHitsTiles(b.x, b.y, b.w, b.h, this.tiles, SOLID_FOR_BULLET);
         if (hit){
+          const wasFlag = this.tiles[hit.ty][hit.tx] === T.FLAG;
           this.damageTile(hit.tx, hit.ty, b.power, b);
           if (b.owner && b.owner.power >= 3){
             const [ox, oy] = dx !== 0 ? [0, 1] : [1, 0];
             this.damageTile(hit.tx + ox, hit.ty + oy, b.power, b);
           }
-          if (this.onHit) this.onHit(b.x + b.w/2, b.y + b.h/2, 'wall');
+          if (this.onHit) this.onHit(b.x + b.w/2, b.y + b.h/2, wasFlag ? 'base' : 'wall');
           b.alive = false; break;
         }
         for (const t of this.tanks){
@@ -310,6 +320,8 @@ const { EnemyAI } = C;
 const { makeRng } = C;
 
 const BONUS_TYPES = ['grenade','helmet','star','shovel','tank','clock'];
+const SPAWN_INTERVAL = 10; // секунд между гибелью врага и появлением замены
+const BONUS_LIFE = 30;     // сколько секунд бонус живёт на поле
 
 class Game {
   constructor(level, opts){
@@ -326,7 +338,7 @@ class Game {
     this.spawnQueue = [];
     this.enemiesOnField = 0;
     this.enemyAis = new Map();
-    this.spawnCooldown = 0;
+    this.respawnQueue = []; // моменты гибели врагов: замена через SPAWN_INTERVAL
     this.baseShovel = 0;
     this.freezeTimer = 0;
     this.stats = { kills:0, score:0, bonuses:0, time:0 };
@@ -338,6 +350,11 @@ class Game {
     E.onShot = (tank) => this.onSound('shoot', !!tank.isPlayer);
     E.onHit = (x, y, kind) => {
       if (kind === 'steel') this.onSound('ricochet');
+      if (kind === 'base'){
+        // штаб подбит: большой взрыв + звук
+        this.onSound('baseDestroyed');
+        this.explosions.push({ x: 16 + x, y: 56 + y, t0: this.time, dur: 1.4, big: true, seed: Math.random() * 6 });
+      }
       this.sparkles.push({ x: 16 + x, y: 56 + y, t0: this.time, dur: 0.28 });
     };
     E.onClash = (x, y) => {
@@ -347,7 +364,7 @@ class Game {
     E.onDeath = (t) => {
       this.explosions.push({ x: 16 + t.x + 16, y: 56 + t.y + 16, t0: this.time,
         dur: t.isPlayer ? 0.9 : 0.55, big: t.isPlayer || t.type === 'armor', seed: Math.random() * 6 });
-      if (!t.isPlayer) this.onSound('explosion', false);
+      if (!t.isPlayer){ this.onSound('explosion', false); this.respawnQueue.push(this.time); }
     };
   }
   startLevel(){
@@ -378,6 +395,10 @@ class Game {
     }
     this.enemiesRemaining = this.spawnQueue.length;
     this.levelTime = 0;
+    // старт: сразу три врага (углы + середина верхней кромки)
+    let spawnedNow = 0;
+    for (let s = 0; s < 3; s++) if (this.spawnEnemy()) spawnedNow++;
+    this.enemiesRemaining -= spawnedNow;
   }
   freeEnemyCell(){
     const cells = ENEMY_CELLS.slice().sort(() => this.rng.next() - 0.5);
@@ -407,7 +428,7 @@ class Game {
   }
   dropBonus(x, y){
     const type = this.rng.pick(BONUS_TYPES);
-    this.engine.bonuses.push({ x: x + 16 - 12, y: y + 16 - 12, w: 24, h: 24, type, alive: true, t: 0 });
+    this.engine.bonuses.push({ x: x + 16 - 12, y: y + 16 - 12, w: 24, h: 24, type, alive: true, t: 0, t0: this.time });
     this.onSound('bonusDrop');
   }
   applyBonus(type){
@@ -422,6 +443,7 @@ class Game {
             this.engine.stats.score += ENEMY_TYPES[t.type].score;
             this.engine.stats.kills++;
             this.onEvent('explosion', t.x, t.y);
+            this.respawnQueue.push(this.time);
           }
         }
         break;
@@ -494,11 +516,13 @@ class Game {
     const w = this.engine;
     this.enemiesOnField = w.tanks.filter(t => !t.isPlayer && t.alive).length;
     if (this.enemiesRemaining > 0 && this.enemiesOnField < this.budget.maxOn){
-      this.spawnCooldown -= dt;
-      if (this.spawnCooldown <= 0){
+      if (this.respawnQueue.length === 0){
+        // очередь пуста, а на поле меньше трёх — спавним сразу
+        if (this.spawnEnemy()) this.enemiesRemaining--;
+      } else if (this.time - this.respawnQueue[0] >= SPAWN_INTERVAL){
         if (this.spawnEnemy()){
           this.enemiesRemaining--;
-          this.spawnCooldown = 2.2;
+          this.respawnQueue.shift();
         }
       }
     }
@@ -527,13 +551,14 @@ class Game {
       }
     }
     this.pickupBonuses();
+    // бонус живёт на поле BONUS_LIFE секунд
+    this.engine.bonuses = this.engine.bonuses.filter(b => this.time - (b.t0 || 0) < BONUS_LIFE);
     if (!this.player.alive && this.state === 'playing') this.killPlayer();
     let flagAlive = false;
     for (let y = FLAG[1]; y <= FLAG[3]; y++) for (let x = FLAG[0]; x <= FLAG[2]; x++)
       if (w.tiles[y][x] === 6) flagAlive = true;
     if (!flagAlive && this.state === 'playing'){
       this.state = 'gameover'; this.gameoverReason = 'base';
-      this.onSound('baseDestroyed');
     }
     for (const t of w.tanks){
       if (!t.isPlayer && !t.alive && t.bonusDrop && !t.dropped){
@@ -584,7 +609,7 @@ class SFX {
     if (this.master) this.master.gain.value = v ? 0.35 : 0;
     if (!v) this.stopEngine();
   }
-  resume(){ if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); }
+  resume(){ if (!this.ctx) this.ensure(); if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); }
   voiceOk(){ return this.enabled && this.ctx && this.activeVoices < VOICE_LIMIT; }
   noiseBuffer(dur){
     const ctx = this.ctx;
