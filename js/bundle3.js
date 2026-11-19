@@ -123,7 +123,7 @@ function drawFlag(ctx, x, y, time){
   ctx.closePath(); ctx.fill();
 }
 function drawBullet(ctx, b, player){
-  const cx = b.x + b.w/2, cy = b.y + b.h/2;
+  const cx = OFF_X + b.x + b.w/2, cy = OFF_Y + b.y + b.h/2;
   const [dx, dy] = DIRV[b.dir];
   ctx.fillStyle = player ? 'rgba(255,232,144,0.35)' : 'rgba(255,112,64,0.35)';
   ctx.beginPath();
@@ -165,7 +165,7 @@ function drawBonus(ctx, b, time){
   if (age > 27) { if ((time * 8) % 1 < 0.5) return; }      // финальное быстрое мигание
   else if (age > 22) { if ((time * 4) % 1 < 0.5) return; } // предсмертное мигание
   const bob = Math.sin(time * 5) * 2;
-  const x = b.x, y = b.y + bob;
+  const x = OFF_X + b.x, y = OFF_Y + b.y + bob;
   ctx.fillStyle = 'rgba(20,20,26,0.85)';
   roundRect(ctx, x, y, b.w, b.h, 4); ctx.fill();
   ctx.strokeStyle = '#e8c840'; ctx.lineWidth = 2;
@@ -495,7 +495,7 @@ function drawPause(ctx, time){
   ctx.fillText('P — продолжить · ESC — в меню', CANVAS_W/2, CANVAS_H/2 + 22);
   ctx.textAlign = 'left';
 }
-if (typeof window !== 'undefined') Object.assign(window.__TANKS__, { RENDER: { drawTank, drawField, drawBonus, drawHUD, drawIntro, drawMenu, drawLevelSelect, drawStats, drawGameover, drawPause, drawIntroTank, CANVAS_W, CANVAS_H, OFF_X, OFF_Y, ENEMY_COLOR } });
+if (typeof window !== 'undefined') Object.assign(window.__TANKS__, { RENDER: { drawTank, drawField, drawBonus, drawBullet, drawHUD, drawIntro, drawMenu, drawLevelSelect, drawStats, drawGameover, drawPause, drawIntroTank, CANVAS_W, CANVAS_H, OFF_X, OFF_Y, ENEMY_COLOR } });
 })();
 
 /* ===== ui.js ===== */
