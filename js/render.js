@@ -207,18 +207,38 @@ function drawBonus(ctx, b, time){
 function drawExplosion(ctx, ex, time){
   const p = (time - ex.t0) / ex.dur;
   if (p < 0 || p > 1) return;
-  const r = 6 + p * (ex.big ? 26 : 14);
   const a = 1 - p;
-  for (let i = 0; i < (ex.big ? 8 : 5); i++){
-    const ang = i * Math.PI / 4 + ex.seed;
-    const rr = r * (0.5 + 0.5 * Math.sin(time * 20 + i));
-    ctx.fillStyle = 'rgba(255,' + Math.floor(140 + 100 * (1 - p)) + ',40,' + a + ')';
+  const r = 8 + p * (ex.big ? 36 : 20);
+  // яркая вспышка в начале
+  if (p < 0.35){
+    const fa = 1 - p / 0.35;
+    ctx.fillStyle = 'rgba(255,255,215,' + (fa * 0.95) + ')';
+    ctx.beginPath(); ctx.arc(ex.x, ex.y, r * (0.55 + 0.45 * (1 - p / 0.35)), 0, 7); ctx.fill();
+  }
+  // огненные лепестки
+  const petals = ex.big ? 10 : 6;
+  for (let i = 0; i < petals; i++){
+    const ang = i * Math.PI / (petals / 2) + ex.seed;
+    const rr = r * (0.45 + 0.55 * Math.sin(time * 22 + i * 2.1));
+    ctx.fillStyle = 'rgba(255,' + Math.floor(120 + 110 * (1 - p)) + ',40,' + (a * 0.9) + ')';
     ctx.beginPath();
-    ctx.arc(ex.x + Math.cos(ang) * rr * (p + 0.3), ex.y + Math.sin(ang) * rr * (p + 0.3), 4 * (1 - p) + 2, 0, 7);
+    ctx.arc(ex.x + Math.cos(ang) * rr * (0.3 + p), ex.y + Math.sin(ang) * rr * (0.3 + p), (4.5 * (1 - p) + 2) * (ex.big ? 1.2 : 1), 0, 7);
     ctx.fill();
   }
-  ctx.fillStyle = 'rgba(255,255,200,' + (a * 0.8) + ')';
-  ctx.beginPath(); ctx.arc(ex.x, ex.y, r * 0.5, 0, 7); ctx.fill();
+  // расширяющееся кольцо ударной волны
+  ctx.strokeStyle = 'rgba(255,205,90,' + (a * 0.75) + ')';
+  ctx.lineWidth = 3.5 * (1 - p) + 0.8;
+  ctx.beginPath(); ctx.arc(ex.x, ex.y, r * 1.15, 0, 7); ctx.stroke();
+  // осколки, разлетающиеся наружу
+  const shards = ex.big ? 12 : 8;
+  for (let i = 0; i < shards; i++){
+    const ang = i * 2 * Math.PI / shards + ex.seed * 1.7;
+    const dd = r * (0.85 + 0.45 * ((i * 37 % 10) / 10));
+    const sx = ex.x + Math.cos(ang) * dd * (0.35 + 0.65 * p);
+    const sy = ex.y + Math.sin(ang) * dd * (0.35 + 0.65 * p);
+    ctx.fillStyle = 'rgba(255,' + Math.floor(130 + 70 * (1 - p)) + ',55,' + a + ')';
+    ctx.beginPath(); ctx.arc(sx, sy, 2.4 * (1 - p) + 1, 0, 7); ctx.fill();
+  }
 }
 function drawField(ctx, game, time){
   const tiles = game.engine.tiles;
@@ -494,5 +514,5 @@ function drawPause(ctx, time){
   ctx.textAlign = 'left';
 }
 
-if (typeof module !== 'undefined') module.exports = { drawTank, drawField, drawBonus, drawBullet, drawHUD, drawIntro, drawMenu, drawLevelSelect, drawStats, drawGameover, drawPause, drawIntroTank, CANVAS_W, CANVAS_H, OFF_X, OFF_Y, ENEMY_COLOR };
-if (typeof window !== 'undefined') Object.assign(window.__TANKS__ = window.__TANKS__ || {}, { RENDER: { drawTank, drawField, drawBonus, drawBullet, drawHUD, drawIntro, drawMenu, drawLevelSelect, drawStats, drawGameover, drawPause, drawIntroTank, CANVAS_W, CANVAS_H, OFF_X, OFF_Y, ENEMY_COLOR } });
+if (typeof module !== 'undefined') module.exports = { drawTank, drawField, drawBonus, drawBullet, drawExplosion, drawHUD, drawIntro, drawMenu, drawLevelSelect, drawStats, drawGameover, drawPause, drawIntroTank, CANVAS_W, CANVAS_H, OFF_X, OFF_Y, ENEMY_COLOR };
+if (typeof window !== 'undefined') Object.assign(window.__TANKS__ = window.__TANKS__ || {}, { RENDER: { drawTank, drawField, drawBonus, drawBullet, drawExplosion, drawHUD, drawIntro, drawMenu, drawLevelSelect, drawStats, drawGameover, drawPause, drawIntroTank, CANVAS_W, CANVAS_H, OFF_X, OFF_Y, ENEMY_COLOR } });
