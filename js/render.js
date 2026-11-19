@@ -123,12 +123,45 @@ function drawFlag(ctx, x, y, time){
 function drawBullet(ctx, b, player){
   const cx = b.x + b.w/2, cy = b.y + b.h/2;
   const [dx, dy] = DIRV[b.dir];
-  ctx.fillStyle = player ? '#ffe890' : '#ff9060';
-  ctx.fillRect(cx + dx * 2 - 2, cy + dy * 2 - 2, 4, 4);
-  ctx.fillStyle = 'rgba(255,255,220,0.5)';
-  ctx.fillRect(cx + dx * 5 - 1, cy + dy * 5 - 1, 2, 2);
+  ctx.fillStyle = player ? 'rgba(255,232,144,0.35)' : 'rgba(255,112,64,0.35)';
+  ctx.beginPath();
+  ctx.arc(cx - dx * 9, cy - dy * 9, 2.4, 0, 7); ctx.fill();
+  ctx.arc(cx - dx * 4.5, cy - dy * 4.5, 3.2, 0, 7); ctx.fill();
+  ctx.fillStyle = player ? '#ffe890' : '#ff7040';
+  ctx.beginPath(); ctx.arc(cx, cy, 3.6, 0, 7); ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath(); ctx.arc(cx + dx, cy + dy, 1.6, 0, 7); ctx.fill();
+}
+function drawSpawnStar(ctx, cx, cy, r, a){
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - r); ctx.lineTo(cx + r*0.25, cy - r*0.25);
+  ctx.lineTo(cx + r, cy); ctx.lineTo(cx + r*0.25, cy + r*0.25);
+  ctx.lineTo(cx, cy + r); ctx.lineTo(cx - r*0.25, cy + r*0.25);
+  ctx.lineTo(cx - r, cy); ctx.lineTo(cx - r*0.25, cy - r*0.25);
+  ctx.closePath(); ctx.fill();
+  ctx.globalAlpha = a * 0.55;
+  ctx.beginPath(); ctx.arc(cx, cy, r * 0.35, 0, 7); ctx.fill();
+  ctx.restore();
+}
+function drawSparkle(ctx, sp, time){
+  const p = (time - sp.t0) / sp.dur;
+  if (p < 0 || p > 1) return;
+  const a = 1 - p;
+  ctx.strokeStyle = 'rgba(255,240,180,' + a + ')';
+  ctx.lineWidth = 2;
+  const r = 2 + p * 7;
+  ctx.beginPath();
+  ctx.moveTo(sp.x - r, sp.y); ctx.lineTo(sp.x + r, sp.y);
+  ctx.moveTo(sp.x, sp.y - r); ctx.lineTo(sp.x, sp.y + r);
+  ctx.stroke();
 }
 function drawBonus(ctx, b, time){
+  const age = time - (b.t0 === undefined ? 0 : b.t0);
+  if (age > 27) { if ((time * 8) % 1 < 0.5) return; }      // финальное быстрое мигание
+  else if (age > 22) { if ((time * 4) % 1 < 0.5) return; } // предсмертное мигание
   const bob = Math.sin(time * 5) * 2;
   const x = b.x, y = b.y + bob;
   ctx.fillStyle = 'rgba(20,20,26,0.85)';
@@ -179,12 +212,12 @@ function drawExplosion(ctx, ex, time){
   for (let i = 0; i < (ex.big ? 8 : 5); i++){
     const ang = i * Math.PI / 4 + ex.seed;
     const rr = r * (0.5 + 0.5 * Math.sin(time * 20 + i));
-    ctx.fillStyle = `rgba(255,${Math.floor(140 + 100 * (1 - p))},40,${a})`;
+    ctx.fillStyle = 'rgba(255,' + Math.floor(140 + 100 * (1 - p)) + ',40,' + a + ')';
     ctx.beginPath();
     ctx.arc(ex.x + Math.cos(ang) * rr * (p + 0.3), ex.y + Math.sin(ang) * rr * (p + 0.3), 4 * (1 - p) + 2, 0, 7);
     ctx.fill();
   }
-  ctx.fillStyle = `rgba(255,255,200,${a * 0.8})`;
+  ctx.fillStyle = 'rgba(255,255,200,' + (a * 0.8) + ')';
   ctx.beginPath(); ctx.arc(ex.x, ex.y, r * 0.5, 0, 7); ctx.fill();
 }
 function drawField(ctx, game, time){
@@ -211,25 +244,22 @@ function drawField(ctx, game, time){
   }
   for (const t of game.engine.tanks){
     if (!t.alive) continue;
-    if (t.spawnFlash > 0){
-      if (Math.sin(time * 20) > 0){
-        ctx.strokeStyle = 'rgba(255,255,255,0.9)';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(OFF_X + t.x - 2, OFF_Y + t.y - 2, TANK + 4, TANK + 4);
-      }
-      continue;
-    }
     drawTank(ctx, OFF_X + t.x + TANK/2, OFF_Y + t.y + TANK/2, t.dir,
       t.isPlayer ? 'player' : (t.elite && Math.sin(time * 12) > 0 ? 'gold' : (ENEMY_COLOR[t.type] || 'grey')), t);
+    if (t.spawnFlash > 0){
+      const a = 0.35 + 0.4 * (0.5 + 0.5 * Math.sin(time * 16));
+      drawSpawnStar(ctx, OFF_X + t.x + TANK/2, OFF_Y + t.y + TANK/2, 11 + 3 * Math.sin(time * 12), a);
+    }
     if (t.shield > 0){
       const a = 0.4 + 0.3 * Math.sin(time * 10);
-      ctx.strokeStyle = `rgba(120,220,255,${a})`;
+      ctx.strokeStyle = 'rgba(120,220,255,' + a + ')';
       ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(OFF_X + t.x + 16, OFF_Y + t.y + 16, 22, 0, 7); ctx.stroke();
     }
   }
   for (const b of game.engine.bullets) drawBullet(ctx, b, b.fromPlayer);
   for (const ex of game.explosions || []) drawExplosion(ctx, ex, time);
+  for (const sp of game.sparkles || []) drawSparkle(ctx, sp, time);
   for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++)
     if (tiles[y][x] === T.FOREST) drawForestTile(ctx, OFF_X + x * CELL, OFF_Y + y * CELL);
 }
@@ -252,8 +282,8 @@ function drawHUD(ctx, game, time){
   ctx.font = 'bold 13px "Courier New", monospace';
   ctx.fillStyle = '#e8e8f0';
   ctx.textBaseline = 'middle';
-  ctx.fillText(`УРОВЕНЬ ${game.level}`, OFF_X, 18);
-  ctx.fillText(`СЧЁТ ${game.engine.stats.score}`, OFF_X, 34);
+  ctx.fillText('УРОВЕНЬ ' + game.level, OFF_X, 18);
+  ctx.fillText('СЧЁТ ' + game.engine.stats.score, OFF_X, 34);
   ctx.fillStyle = '#e8e8f0';
   ctx.fillText('ЖИЗНИ', CANVAS_W/2 - 40, 18);
   for (let i = 0; i < Math.min(6, game.lives); i++)
@@ -265,11 +295,11 @@ function drawHUD(ctx, game, time){
   }
   if (game.baseShovel > 0){
     ctx.fillStyle = '#e8c840';
-    ctx.fillText(`БЕТОН ${Math.ceil(game.baseShovel)}`, CANVAS_W/2 - 40, 34);
+    ctx.fillText('БЕТОН ' + Math.ceil(game.baseShovel), CANVAS_W/2 - 40, 34);
   }
   if (game.freezeTimer > 0){
     ctx.fillStyle = '#78c8e8';
-    ctx.fillText(`ФРИЗ ${Math.ceil(game.freezeTimer)}`, CANVAS_W/2 + 40, 34);
+    ctx.fillText('ФРИЗ ' + Math.ceil(game.freezeTimer), CANVAS_W/2 + 40, 34);
   }
 }
 function drawIntroTank(ctx, cx, cy, scale, time){
@@ -359,7 +389,7 @@ function drawIntro(ctx, time, records){
   if (records && records.length){
     ctx.font = '12px "Courier New", monospace';
     ctx.fillStyle = '#6a748c';
-    ctx.fillText(`РЕКОРД: ${records[0].score} · УРОВЕНЬ ${records[0].level}`, CANVAS_W/2, 434);
+    ctx.fillText('РЕКОРД: ' + records[0].score + ' · УРОВЕНЬ ' + records[0].level, CANVAS_W/2, 434);
   }
   ctx.textAlign = 'left';
 }
@@ -403,7 +433,7 @@ function drawLevelSelect(ctx, menu, time){
   const b = enemyBudget(menu.level);
   ctx.font = '14px "Courier New", monospace';
   ctx.fillStyle = '#9aa4b8';
-  ctx.fillText(`ВРАГОВ: ${b.total} · НА ПОЛЕ: ${b.maxOn} · СКОРОСТЬ ×${b.speedMul.toFixed(2)}`, CANVAS_W/2, 280);
+  ctx.fillText('ВРАГОВ: ' + b.total + ' · НА ПОЛЕ: ' + b.maxOn + ' · СКОРОСТЬ ×' + b.speedMul.toFixed(2), CANVAS_W/2, 280);
   ctx.font = '13px "Courier New", monospace';
   ctx.fillStyle = menu.level <= menu.maxUnlocked ? '#4a8a4a' : '#8a4a4a';
   ctx.fillText(menu.level <= menu.maxUnlocked ? 'ДОСТУПЕН' : 'ЗАКРЫТ — ПРОЙДИТЕ ПРЕДЫДУЩИЕ', CANVAS_W/2, 320);
@@ -418,14 +448,14 @@ function drawStats(ctx, game){
   ctx.textAlign = 'center';
   ctx.font = 'bold 26px "Courier New", monospace';
   ctx.fillStyle = '#4a8a4a';
-  ctx.fillText(`УРОВЕНЬ ${game.level} ПРОЙДЕН`, CANVAS_W/2, 120);
+  ctx.fillText('УРОВЕНЬ ' + game.level + ' ПРОЙДЕН', CANVAS_W/2, 120);
   ctx.font = '16px "Courier New", monospace';
   ctx.fillStyle = '#e8e8f0';
   const s = game.stats;
-  ctx.fillText(`СЧЁТ: ${s.score}`, CANVAS_W/2, 190);
-  ctx.fillText(`УНИЧТОЖЕНО: ${s.kills}`, CANVAS_W/2, 220);
-  ctx.fillText(`БОНУСЫ: ${s.bonuses}`, CANVAS_W/2, 250);
-  ctx.fillText(`ВРЕМЯ: ${Math.floor(s.time/60)}:${String(Math.floor(s.time%60)).padStart(2,'0')}`, CANVAS_W/2, 280);
+  ctx.fillText('СЧЁТ: ' + s.score, CANVAS_W/2, 190);
+  ctx.fillText('УНИЧТОЖЕНО: ' + s.kills, CANVAS_W/2, 220);
+  ctx.fillText('БОНУСЫ: ' + s.bonuses, CANVAS_W/2, 250);
+  ctx.fillText('ВРЕМЯ: ' + Math.floor(s.time/60) + ':' + String(Math.floor(s.time%60)).padStart(2,'0'), CANVAS_W/2, 280);
   ctx.font = '13px "Courier New", monospace';
   if (Math.sin(Date.now() / 400) > 0){
     ctx.fillStyle = '#e8c840';
@@ -442,8 +472,8 @@ function drawGameover(ctx, game){
   ctx.fillText(game.gameoverReason === 'base' ? 'ШТАБ ПАЛ' : 'ТАНК ПОДБИТ', CANVAS_W/2, 150);
   ctx.font = '16px "Courier New", monospace';
   ctx.fillStyle = '#e8e8f0';
-  ctx.fillText(`СЧЁТ: ${game.engine.stats.score}`, CANVAS_W/2, 220);
-  ctx.fillText(`ДОСТИГНУТ УРОВЕНЬ: ${game.level}`, CANVAS_W/2, 250);
+  ctx.fillText('СЧЁТ: ' + game.engine.stats.score, CANVAS_W/2, 220);
+  ctx.fillText('ДОСТИГНУТ УРОВЕНЬ: ' + game.level, CANVAS_W/2, 250);
   ctx.font = '13px "Courier New", monospace';
   if (Math.sin(Date.now() / 400) > 0){
     ctx.fillStyle = '#e8c840';
@@ -463,5 +493,6 @@ function drawPause(ctx, time){
   ctx.fillText('P — продолжить · ESC — в меню', CANVAS_W/2, CANVAS_H/2 + 22);
   ctx.textAlign = 'left';
 }
-if (typeof module !== 'undefined') module.exports = { drawTank, drawField, drawHUD, drawIntro, drawMenu, drawLevelSelect, drawStats, drawGameover, drawPause, drawIntroTank, CANVAS_W, CANVAS_H, OFF_X, OFF_Y, ENEMY_COLOR };
-if (typeof window !== 'undefined') Object.assign(window.__TANKS__ = window.__TANKS__ || {}, { RENDER: { drawTank, drawField, drawHUD, drawIntro, drawMenu, drawLevelSelect, drawStats, drawGameover, drawPause, drawIntroTank, CANVAS_W, CANVAS_H, OFF_X, OFF_Y, ENEMY_COLOR } });
+
+if (typeof module !== 'undefined') module.exports = { drawTank, drawField, drawBonus, drawHUD, drawIntro, drawMenu, drawLevelSelect, drawStats, drawGameover, drawPause, drawIntroTank, CANVAS_W, CANVAS_H, OFF_X, OFF_Y, ENEMY_COLOR };
+if (typeof window !== 'undefined') Object.assign(window.__TANKS__ = window.__TANKS__ || {}, { RENDER: { drawTank, drawField, drawBonus, drawHUD, drawIntro, drawMenu, drawLevelSelect, drawStats, drawGameover, drawPause, drawIntroTank, CANVAS_W, CANVAS_H, OFF_X, OFF_Y, ENEMY_COLOR } });
