@@ -1,7 +1,7 @@
 "use strict";
 const C = typeof require !== 'undefined' && typeof window === 'undefined'
   ? require('./constants') : window.__TANKS__;
-const { CELL, TANK, COLS, ROWS, W, H, T, DIR, DIRV, BIG } = C;
+const { CELL, TANK, COLS, ROWS, W, H, T, DIR, DIRV, BIG, FLAG } = C;
 const SNAP = BIG;
 
 function rectHitsTiles(x, y, w, h, tiles, predicate){
@@ -12,13 +12,14 @@ function rectHitsTiles(x, y, w, h, tiles, predicate){
   return null;
 }
 const SOLID_FOR_TANK = (v) => v === T.BRICK || v === T.STEEL || v === T.WATER;
-const SOLID_FOR_BULLET = (v) => v === T.BRICK || v === T.STEEL;
+const SOLID_FOR_BULLET = (v) => v === T.BRICK || v === T.STEEL || v === T.FLAG;
 
 class Engine {
   constructor(tiles){
     this.tiles = tiles.map(r => r.slice());
     this.tanks = []; this.bullets = []; this.effects = [];
     this.time = 0; this.bonuses = []; this.stats = { kills: 0, score: 0 };
+    this.onShot = null; this.onHit = null; this.onClash = null; this.onDeath = null;
   }
   addTank(o){
     const tank = Object.assign({
@@ -75,12 +76,17 @@ class Engine {
     tank.fireCd = tank.fireRate;
     const [dx, dy] = DIRV[tank.dir];
     const bw = 6;
-    const bx = tank.x + TANK/2 - bw/2 + dx * (TANK/2);
-    const by = tank.y + TANK/2 - bw/2 + dy * (TANK/2);
+    // пуля вылетает с кончика ствола (дуло выступает на 3px за корпус)
+    const nose = TANK/2 + 4;
+    let bx = tank.x + TANK/2 - bw/2 + dx * nose;
+    let by = tank.y + TANK/2 - bw/2 + dy * nose;
+    bx = Math.min(W - bw, Math.max(0, bx));
+    by = Math.min(H - bw, Math.max(0, by));
     const bullet = { x: bx, y: by, w: bw, h: bw, dir: tank.dir, speed: tank.bulletSpeed,
       owner: tank, power: tank.power || 1, alive: true, fromPlayer: tank.isPlayer };
     this.bullets.push(bullet);
     tank.bulletsAlive++;
+    if (this.onShot) this.onShot(tank);
     return bullet;
   }
   damageTile(tx, ty, power, b){
@@ -111,6 +117,12 @@ class Engine {
         return true;
       } return false;
     }
+    if (v === T.FLAG) {
+      // попадание в штаб: флаг уничтожен целиком
+      for (let fy = FLAG[1]; fy <= FLAG[3]; fy++) for (let fx2 = FLAG[0]; fx2 <= FLAG[2]; fx2++)
+        if (this.tiles[fy][fx2] === T.FLAG) this.tiles[fy][fx2] = T.FLAGDEAD;
+      return true;
+    }
     return false;
   }
   hitFlag(){ return this.tiles.some((row, y) => row.some((v, x) => v === T.FLAG)); }
@@ -130,23 +142,28 @@ class Engine {
       for (let s = 0; s < steps && b.alive; s++){
         b.x += dx * sd; b.y += dy * sd;
         if (b.x < 0 || b.y < 0 || b.x + b.w > W || b.y + b.h > H){ b.alive = false; break; }
+        // столкновение пуль на каждом подшаге — иначе пули проскакивают друг мимо друга
+        for (const o of this.bullets){
+          if (o === b || !o.alive) continue;
+          if (b.fromPlayer !== o.fromPlayer &&
+              b.x < o.x + o.w && b.x + b.w > o.x && b.y < o.y + o.h && b.y + b.h > o.y){
+            b.alive = false; o.alive = false;
+            if (this.onClash) this.onClash(b.x + b.w/2, b.y + b.h/2);
+            break;
+          }
+        }
+        if (!b.alive) break;
         const hit = rectHitsTiles(b.x, b.y, b.w, b.h, this.tiles, SOLID_FOR_BULLET);
         if (hit){
+          const wasFlag = this.tiles[hit.ty][hit.tx] === T.FLAG;
           this.damageTile(hit.tx, hit.ty, b.power, b);
           if (b.owner && b.owner.power >= 3){
             const [ox, oy] = dx !== 0 ? [0, 1] : [1, 0];
             this.damageTile(hit.tx + ox, hit.ty + oy, b.power, b);
           }
+          if (this.onHit) this.onHit(b.x + b.w/2, b.y + b.h/2, wasFlag ? 'base' : 'wall');
           b.alive = false; break;
         }
-        for (const o of this.bullets){
-          if (o === b || !o.alive) continue;
-          if (b.fromPlayer !== o.fromPlayer &&
-              b.x < o.x + o.w && b.x + b.w > o.x && b.y < o.y + o.h && b.y + b.h > o.y){
-            b.alive = false; o.alive = false; break;
-          }
-        }
-        if (!b.alive) break;
         for (const t of this.tanks){
           if (!t.alive || t === b.owner) continue;
           if (!b.fromPlayer && !t.isPlayer) continue;
@@ -156,7 +173,8 @@ class Engine {
             if (t.hp <= 0){
               t.alive = false;
               if (!t.isPlayer){ this.stats.kills++; this.stats.score += ENEMY_SCORE[t.type] || 100; }
-            }
+              if (this.onDeath) this.onDeath(t);
+            } else if (this.onHit) this.onHit(b.x + b.w/2, b.y + b.h/2, 'tank');
             b.alive = false; break;
           }
         }
@@ -167,5 +185,6 @@ class Engine {
   }
 }
 const ENEMY_SCORE = { basic: 100, fast: 200, sniper: 300, armor: 400 };
+
 if (typeof module !== 'undefined') module.exports = { Engine, rectHitsTiles, SOLID_FOR_TANK, SOLID_FOR_BULLET, ENEMY_SCORE, SNAP };
 if (typeof window !== 'undefined') Object.assign(window.__TANKS__ = window.__TANKS__ || {}, { Engine });

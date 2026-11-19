@@ -24,7 +24,7 @@ class SFX {
     if (this.master) this.master.gain.value = v ? 0.35 : 0;
     if (!v) this.stopEngine();
   }
-  resume(){ if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); }
+  resume(){ if (!this.ctx) this.ensure(); if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); }
   voiceOk(){ return this.enabled && this.ctx && this.activeVoices < VOICE_LIMIT; }
   noiseBuffer(dur){
     const ctx = this.ctx;
@@ -137,5 +137,6 @@ class SFX {
     }
   }
 }
+
 if (typeof module !== 'undefined') module.exports = { SFX };
 if (typeof window !== 'undefined') Object.assign(window.__TANKS__ = window.__TANKS__ || {}, { SFX });
