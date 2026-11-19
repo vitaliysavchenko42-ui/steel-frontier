@@ -8,8 +8,12 @@ const { EnemyAI } = typeof require !== 'undefined' && typeof window === 'undefin
   ? require('./ai') : window.__TANKS__;
 const { makeRng } = typeof require !== 'undefined' && typeof window === 'undefined'
   ? require('./rng') : window.__TANKS__;
+const MapGen = typeof require !== 'undefined' && typeof window === 'undefined'
+  ? require('./mapgen') : window.__TANKS__.MapGen;
 
 const BONUS_TYPES = ['grenade','helmet','star','shovel','tank','clock'];
+const SPAWN_INTERVAL = 10; // секунд между гибелью врага и появлением замены
+const BONUS_LIFE = 30;     // сколько секунд бонус живёт на поле
 
 class Game {
   constructor(level, opts){
@@ -26,19 +30,37 @@ class Game {
     this.spawnQueue = [];
     this.enemiesOnField = 0;
     this.enemyAis = new Map();
-    this.spawnCooldown = 0;
+    this.respawnQueue = []; // моменты гибели врагов: замена через SPAWN_INTERVAL
     this.baseShovel = 0;
     this.freezeTimer = 0;
     this.stats = { kills:0, score:0, bonuses:0, time:0 };
     this.playerPower = 1;
+    this.explosions = [];
+    this.sparkles = [];
     this.startLevel();
-  }
-  mapGen(){
-    return typeof require !== 'undefined' && typeof window === 'undefined'
-      ? require('./mapgen') : window.__TANKS__.MapGen;
+    const E = this.engine;
+    E.onShot = (tank) => this.onSound('shoot', !!tank.isPlayer);
+    E.onHit = (x, y, kind) => {
+      if (kind === 'steel') this.onSound('ricochet');
+      if (kind === 'base'){
+        // штаб подбит: большой взрыв + звук
+        this.onSound('baseDestroyed');
+        this.explosions.push({ x: 16 + x, y: 56 + y, t0: this.time, dur: 1.4, big: true, seed: Math.random() * 6 });
+      }
+      this.sparkles.push({ x: 16 + x, y: 56 + y, t0: this.time, dur: 0.28 });
+    };
+    E.onClash = (x, y) => {
+      this.onSound('ricochet');
+      this.sparkles.push({ x: 16 + x, y: 56 + y, t0: this.time, dur: 0.35 });
+    };
+    E.onDeath = (t) => {
+      this.explosions.push({ x: 16 + t.x + 16, y: 56 + t.y + 16, t0: this.time,
+        dur: t.isPlayer ? 0.9 : 0.55, big: t.isPlayer || t.type === 'armor', seed: Math.random() * 6 });
+      if (!t.isPlayer){ this.onSound('explosion', false); this.respawnQueue.push(this.time); }
+    };
   }
   startLevel(){
-    const m = this.mapGen().generateMap(this.level);
+    const m = MapGen.generateMap(this.level);
     this.engine = new Engine(m.tiles);
     this.map = m;
     this.mapTilesOrig = m.tiles.map(r => r.slice());
@@ -65,6 +87,10 @@ class Game {
     }
     this.enemiesRemaining = this.spawnQueue.length;
     this.levelTime = 0;
+    // старт: сразу три врага (углы + середина верхней кромки)
+    let spawnedNow = 0;
+    for (let s = 0; s < 3; s++) if (this.spawnEnemy()) spawnedNow++;
+    this.enemiesRemaining -= spawnedNow;
   }
   freeEnemyCell(){
     const cells = ENEMY_CELLS.slice().sort(() => this.rng.next() - 0.5);
@@ -94,7 +120,7 @@ class Game {
   }
   dropBonus(x, y){
     const type = this.rng.pick(BONUS_TYPES);
-    this.engine.bonuses.push({ x: x + 16 - 12, y: y + 16 - 12, w: 24, h: 24, type, alive: true, t: 0 });
+    this.engine.bonuses.push({ x: x + 16 - 12, y: y + 16 - 12, w: 24, h: 24, type, alive: true, t: 0, t0: this.time });
     this.onSound('bonusDrop');
   }
   applyBonus(type){
@@ -109,6 +135,7 @@ class Game {
             this.engine.stats.score += ENEMY_TYPES[t.type].score;
             this.engine.stats.kills++;
             this.onEvent('explosion', t.x, t.y);
+            this.respawnQueue.push(this.time);
           }
         }
         break;
@@ -176,14 +203,18 @@ class Game {
   step(dt, input){
     if (this.state !== 'playing') return;
     this.time += dt; this.levelTime += dt;
+    this.explosions = this.explosions.filter(e => this.time - e.t0 < e.dur);
+    this.sparkles = this.sparkles.filter(e => this.time - e.t0 < e.dur);
     const w = this.engine;
     this.enemiesOnField = w.tanks.filter(t => !t.isPlayer && t.alive).length;
     if (this.enemiesRemaining > 0 && this.enemiesOnField < this.budget.maxOn){
-      this.spawnCooldown -= dt;
-      if (this.spawnCooldown <= 0){
+      if (this.respawnQueue.length === 0){
+        // очередь пуста, а на поле меньше трёх — спавним сразу
+        if (this.spawnEnemy()) this.enemiesRemaining--;
+      } else if (this.time - this.respawnQueue[0] >= SPAWN_INTERVAL){
         if (this.spawnEnemy()){
           this.enemiesRemaining--;
-          this.spawnCooldown = 2.2;
+          this.respawnQueue.shift();
         }
       }
     }
@@ -212,13 +243,14 @@ class Game {
       }
     }
     this.pickupBonuses();
+    // бонус живёт на поле BONUS_LIFE секунд
+    this.engine.bonuses = this.engine.bonuses.filter(b => this.time - (b.t0 || 0) < BONUS_LIFE);
     if (!this.player.alive && this.state === 'playing') this.killPlayer();
     let flagAlive = false;
     for (let y = FLAG[1]; y <= FLAG[3]; y++) for (let x = FLAG[0]; x <= FLAG[2]; x++)
       if (w.tiles[y][x] === 6) flagAlive = true;
     if (!flagAlive && this.state === 'playing'){
       this.state = 'gameover'; this.gameoverReason = 'base';
-      this.onSound('baseDestroyed');
     }
     for (const t of w.tanks){
       if (!t.isPlayer && !t.alive && t.bonusDrop && !t.dropped){
@@ -238,5 +270,6 @@ class Game {
     return orig[y][x] === 2;
   }
 }
+
 if (typeof module !== 'undefined') module.exports = { Game, BONUS_TYPES };
 if (typeof window !== 'undefined') Object.assign(window.__TANKS__ = window.__TANKS__ || {}, { Game, BONUS_TYPES });

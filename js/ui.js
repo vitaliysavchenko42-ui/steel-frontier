@@ -1,16 +1,18 @@
 "use strict";
+const C = typeof require !== 'undefined' && typeof window === 'undefined'
+  ? require('./game') : window.__TANKS__;
 const R = typeof require !== 'undefined' && typeof window === 'undefined'
   ? require('./render') : window.__TANKS__.RENDER;
 const CANVAS_W = R.CANVAS_W, CANVAS_H = R.CANVAS_H;
 const LS_KEY = 'steel-frontier-records';
 function loadRecords(){
-  try { return JSON.parse((typeof localStorage !== 'undefined' ? localStorage.getItem(LS_KEY) : null) || '[]'); } catch(e){ return []; }
+  try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]'); } catch(e){ return []; }
 }
 function saveRecord(rec){
   const recs = loadRecords();
   recs.push(rec);
   recs.sort((a, b) => b.score - a.score);
-  if (typeof localStorage !== 'undefined') localStorage.setItem(LS_KEY, JSON.stringify(recs.slice(0, 10)));
+  localStorage.setItem(LS_KEY, JSON.stringify(recs.slice(0, 10)));
 }
 function maxUnlocked(){
   const r = loadRecords();
@@ -32,24 +34,15 @@ class UI {
     this.game = null;
     this.pendingStats = null;
   }
-  getGame(){
-    return typeof require !== 'undefined' && typeof window === 'undefined'
-      ? require('./game').Game : window.__TANKS__.Game;
-  }
-  spawnFx(x, y, big){
-    if (!this.game) return;
-    this.game.explosions.push({ x: 16 + x + 16, y: 56 + y + 16, t0: this.time, dur: big ? 0.7 : 0.4, big, seed: Math.random() * 6 });
-    if (this.sfx.explosion) this.sfx.explosion(big);
-  }
   startGame(level){
-    const G = this.getGame();
+    const G = C.Game;
     this.game = new G(level, {
       onSound: (name) => { if (this.sfx[name]) this.sfx[name](); },
       onEvent: () => {},
     });
-    this.game.explosions = [];
-    this.game.onEvent = (type, x, y) => { if (type === 'explosion') this.spawnFx(x, y, true); };
     this.mode = 'playing';
+    if (this.sfx.ensure) this.sfx.ensure();
+    if (this.sfx.resume) this.sfx.resume();
     if (this.sfx.playTheme) this.sfx.playTheme();
   }
   nextLevel(){
@@ -67,7 +60,7 @@ class UI {
     const sfx = this.sfx;
     const confirm = down && (code === 'Space' || code === 'Enter' || code === 'TouchStart');
     if (this.mode === 'intro'){
-      if (confirm){ if (sfx.resume) sfx.resume(); this.mode = 'menu'; }
+      if (confirm){ if (sfx.ensure) sfx.ensure(); if (sfx.resume) sfx.resume(); this.mode = 'menu'; if (sfx.playTheme) sfx.playTheme(); }
       return;
     }
     if (this.mode === 'menu'){
@@ -103,9 +96,6 @@ class UI {
   }
   update(dt, keys){
     this.time += dt;
-    if (this.game && this.game.explosions){
-      this.game.explosions = this.game.explosions.filter(e => (this.time - e.t0) < e.dur);
-    }
   }
   render(){
     const ctx = this.ctx;
@@ -114,8 +104,8 @@ class UI {
     else if (this.mode === 'levelSelect') R.drawLevelSelect(ctx, this.menu, this.time);
     else if (this.mode === 'playing' || this.mode === 'paused'){
       const g = this.game;
-      R.drawField(ctx, g, this.time);
-      R.drawHUD(ctx, g, this.time);
+      R.drawField(ctx, g, g.time);
+      R.drawHUD(ctx, g, g.time);
       if (this.mode === 'paused') R.drawPause(ctx, this.time);
       if (g.state === 'won' && !g.statsShown){
         g.statsShown = true;
@@ -133,5 +123,6 @@ class UI {
     else if (this.mode === 'gameover' && this.game) R.drawGameover(ctx, this.game);
   }
 }
+
 if (typeof module !== 'undefined') module.exports = { UI, loadRecords, saveRecord, maxUnlocked, LS_KEY };
 if (typeof window !== 'undefined') Object.assign(window.__TANKS__ = window.__TANKS__ || {}, { UI, UI_HELPERS: { loadRecords, saveRecord, maxUnlocked } });
