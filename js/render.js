@@ -16,17 +16,28 @@ function roundRect(ctx, x, y, w, h, r){
   ctx.arcTo(x, y, x + w, y, r);
   ctx.closePath();
 }
+function drawStarShape(ctx, cx, cy, rO, rI){
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++){
+    const r = i % 2 ? rI : rO;
+    const a = -Math.PI/2 + i * Math.PI/5;
+    ctx[i ? 'lineTo' : 'moveTo'](cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+  }
+  ctx.closePath();
+}
 function drawTank(ctx, cx, cy, dir, style, t){
   const s = TANK;
+  const isP = style === 'player';
+  const et = isP ? 'basic' : ((t && t.type) || 'basic');
   ctx.save();
   ctx.translate(cx, cy);
   ctx.rotate(dir * Math.PI / 2);
-  const palette = style === 'player'
+  const palette = isP
     ? { body: '#4d7a3a', body2: '#3a5c2b', tracks: '#2b2b2b', barrel: '#8a8a8a', accent: '#c8b06a' }
-    : style === 'grey'   ? { body: '#8d8d8d', body2: '#6f6f6f', tracks: '#2b2b2b', barrel: '#b0b0b0', accent: '#4a4a4a' }
-    : style === 'cyan'   ? { body: '#4fa8b8', body2: '#3a7d8a', tracks: '#2b2b2b', barrel: '#a0d0d8', accent: '#2a5a64' }
-    : style === 'gold'   ? { body: '#c8a832', body2: '#9a7d20', tracks: '#2b2b2b', barrel: '#e8d070', accent: '#5a4810' }
-    :                      { body: '#5a7d4a', body2: '#43602f', tracks: '#2b2b2b', barrel: '#9ab878', accent: '#2c4020' };
+    : et === 'fast'   ? { body: '#49c2d4', body2: '#2a8fa0', tracks: '#1e1e1e', barrel: '#c8f2f8', accent: '#0e5a66' }
+    : et === 'sniper' ? { body: '#d4b13a', body2: '#a3851f', tracks: '#1e1e1e', barrel: '#8a7a3a', accent: '#5a4810' }
+    : et === 'armor'  ? { body: '#7fae46', body2: '#57832c', tracks: '#141414', barrel: '#a8c98a', accent: '#2c4020' }
+    :                    { body: '#9a9a9a', body2: '#6f6f6f', tracks: '#2b2b2b', barrel: '#c0c0c0', accent: '#4a4a4a' };
   ctx.fillStyle = palette.tracks;
   ctx.fillRect(-s/2, -s/2 + 2, 7, s - 4);
   ctx.fillRect(s/2 - 7, -s/2 + 2, 7, s - 4);
@@ -49,8 +60,75 @@ function drawTank(ctx, cx, cy, dir, style, t){
   roundRect(ctx, -7, -7, 14, 14, 4); ctx.fill();
   ctx.fillStyle = palette.body;
   roundRect(ctx, -5.5, -5.5, 11, 11, 3.5); ctx.fill();
-  ctx.fillStyle = palette.barrel;
-  ctx.fillRect(-1.5, -TANK/2 - 3, 3, TANK/2 - 1);
+  if (et === 'fast'){
+    ctx.fillStyle = 'rgba(0,0,0,0.30)';
+    ctx.beginPath();
+    ctx.moveTo(-s/2 + 7, -s/2 + 3);
+    ctx.lineTo(s/2 - 7, -s/2 + 3);
+    ctx.lineTo(0, s/2 - 2);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#111';
+    ctx.fillRect(-s/2 + 8, s/2 - 10, 5, 4);
+    ctx.fillRect(s/2 - 13, s/2 - 10, 5, 4);
+  } else if (et === 'armor'){
+    ctx.fillStyle = '#101010';
+    ctx.fillRect(-s/2 - 2, -s/2 + 1, 9, s - 2);
+    ctx.fillRect(s/2 - 7, -s/2 + 1, 9, s - 2);
+    ctx.fillStyle = '#8a8a8a';
+    for (let i = 0; i < 4; i++){
+      ctx.fillRect(-s/2 + 0.5, -s/2 + 4 + i * 7, 3, 3);
+      ctx.fillRect(s/2 - 3.5, -s/2 + 4 + i * 7, 3, 3);
+    }
+    ctx.fillStyle = 'rgba(0,0,0,0.30)';
+    ctx.fillRect(-s/2 + 6, -s/2 + 4, s - 12, 3.5);
+    ctx.fillRect(-s/2 + 6, s/2 - 8, s - 12, 3.5);
+    ctx.fillStyle = palette.body2;
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++){
+      const a = i * Math.PI / 4 + Math.PI / 8;
+      ctx[i ? 'lineTo' : 'moveTo'](Math.cos(a) * 9.5, Math.sin(a) * 9.5);
+    }
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = palette.body;
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++){
+      const a = i * Math.PI / 4 + Math.PI / 8;
+      ctx[i ? 'lineTo' : 'moveTo'](Math.cos(a) * 6.8, Math.sin(a) * 6.8);
+    }
+    ctx.closePath(); ctx.fill();
+  }
+  if (et === 'sniper'){
+    ctx.fillStyle = palette.barrel;
+    ctx.fillRect(-1.5, -TANK/2 - 7, 3, TANK/2 - 1 + 7);
+    ctx.fillStyle = '#333';
+    ctx.fillRect(-2.5, -TANK/2 - 8.5, 5, 2.5);
+    ctx.fillStyle = '#1a1a1a';
+    ctx.beginPath(); ctx.arc(0, -2, 3.4, 0, 7); ctx.fill();
+    ctx.fillStyle = '#7fdcff';
+    ctx.beginPath(); ctx.arc(0, -2, 1.8, 0, 7); ctx.fill();
+  } else {
+    ctx.fillStyle = palette.barrel;
+    ctx.fillRect(-1.5, -TANK/2 - 3, 3, TANK/2 - 1);
+  }
+  if (isP && t){
+    if (t.power >= 3){
+      ctx.fillStyle = '#e8d070';
+      ctx.fillRect(-4.2, -TANK/2 - 4, 2.8, TANK/2 - 2);
+      ctx.fillRect(1.4, -TANK/2 - 4, 2.8, TANK/2 - 2);
+    } else if (t.power >= 2){
+      ctx.fillStyle = '#e8d070';
+      ctx.fillRect(-1.5, -TANK/2 - 5, 3, TANK/2 - 2);
+    }
+    if (t.power >= 3){
+      ctx.fillStyle = '#ffd700';
+      drawStarShape(ctx, 0, 0.5, 3.8, 1.8); ctx.fill();
+    }
+    if (t.power >= 4){
+      ctx.strokeStyle = '#e8c840';
+      ctx.lineWidth = 1.6;
+      roundRect(ctx, -s/2 + 5.5, -s/2 + 2.5, s - 11, s - 5, 2); ctx.stroke();
+    }
+  }
   ctx.fillStyle = palette.accent;
   ctx.fillRect(-2.5, 1, 5, 4);
   ctx.restore();
