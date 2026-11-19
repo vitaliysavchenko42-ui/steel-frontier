@@ -76,8 +76,8 @@ class Engine {
     tank.fireCd = tank.fireRate;
     const [dx, dy] = DIRV[tank.dir];
     const bw = 6;
-    // пуля вылетает с кончика ствола (дуло выступает на 3px за корпус)
-    const nose = TANK/2 + 4;
+    // пуля вылетает с кончика ствола; у снайпера ствол длиннее
+    const nose = (tank.type === 'sniper') ? TANK/2 + 8 : TANK/2 + 4;
     let bx = tank.x + TANK/2 - bw/2 + dx * nose;
     let by = tank.y + TANK/2 - bw/2 + dy * nose;
     bx = Math.min(W - bw, Math.max(0, bx));
@@ -108,7 +108,7 @@ class Engine {
       return true;
     }
     if (v === T.STEEL) {
-      if (power >= 3) {
+      if (power >= 4) {
         this.tiles[ty][tx] = T.EMPTY;
         const [sdx, sdy] = (b && b.dir % 2 === 0) ? [1, 0] : [0, 1];
         const nx3 = tx + sdx, ny3 = ty + sdy;
@@ -157,7 +157,7 @@ class Engine {
         if (hit){
           const wasFlag = this.tiles[hit.ty][hit.tx] === T.FLAG;
           this.damageTile(hit.tx, hit.ty, b.power, b);
-          if (b.owner && b.owner.power >= 3){
+          if (b.owner && b.owner.power >= 4){
             const [ox, oy] = dx !== 0 ? [0, 1] : [1, 0];
             this.damageTile(hit.tx + ox, hit.ty + oy, b.power, b);
           }
