@@ -21,6 +21,8 @@ class EnemyAI {
     this.attackT = 0;
     this.replanCd = 2 + rand();
     this.stuck = 0; this.lastX = tank.x; this.lastY = tank.y;
+    this.stuckWindow = 0; this.winX = undefined; this.winY = undefined;
+    this.escapeT = 0; // таймер выхода из тупика
   }
   refreshField(){ this.dist = this.approach ? computeFieldTo(this.world.tiles, this.approach) : computeField(this.world.tiles); }
   cellFree(bx, by){
@@ -48,7 +50,7 @@ class EnemyAI {
     } else {
       // «разъезд»: иногда выбираем не самый короткий путь, а один из почти равных
       const near = pool.filter(c => this.dist[c.cy][c.cx] <= bestD + this.spread);
-      if (near.length > 1 && rand() < 0.45) best = near[Math.floor(rand() * near.length)];
+      if (near.length > 1 && this.spread > 0 && rand() < 0.45) best = near[Math.floor(rand() * near.length)];
     }
     this.goal = best;
   }
@@ -75,6 +77,15 @@ class EnemyAI {
     if (Math.abs(t.x - this.lastX) < 1 && Math.abs(t.y - this.lastY) < 1) this.stuck += dt;
     else this.stuck = 0;
     this.lastX = t.x; this.lastY = t.y;
+    // анти-топтание: не стоять на месте дольше ~2с — принудительный разъезд
+    this.stuckWindow += dt;
+    if (this.stuckWindow >= 2){
+      const moved = Math.abs(t.x - (this.winX === undefined ? t.x : this.winX))
+                  + Math.abs(t.y - (this.winY === undefined ? t.y : this.winY));
+      this.stuckWindow = 0; this.winX = t.x; this.winY = t.y;
+      if (moved < 16) this.hardUnstick(t);
+    }
+    if (this.escapeT > 0) this.escapeT -= dt;
     if (this.stuck > 1.2){
       let shotAtGoal = false;
       if (this.goal && this.isBrickCell(this.goal.cx, this.goal.cy)){
@@ -88,7 +99,8 @@ class EnemyAI {
       if (!shotAtGoal) this.pickGoal();
       this.stuck = 0;
     }
-    const sight = this.seesPlayer();
+    // во время выхода из тупика — только движение к цели, не огонь по игроку
+    const sight = this.escapeT > 0 ? false : this.seesPlayer();
     let targetDir = t.dir;
     if (sight && this.attackT <= 0 && rand() < 0.65) this.attackT = this.p.attackOnSight * (0.5 + rand()*0.7);
     if (this.attackT > 0){
@@ -109,6 +121,34 @@ class EnemyAI {
     }
     const shootNow = (sight && this.attackT > 0 && rand() < 0.5) || (this.goal && this.isBrickCell(this.goal.cx, this.goal.cy) && goalDist < 64) || this.brickAhead();
     if (t.fireCd <= 0 && shootNow && rand() < 0.85 * this.p.fireMul) w.fire(t);
+  }
+  tankAt(bx, by){
+    const px = bx * 32, py = by * 32;
+    for (const o of this.world.tanks){
+      if (o === this.tank || !o.alive) continue;
+      if (o.x < px + 32 && o.x + 32 > px && o.y < py + 32 && o.y + 32 > py) return true;
+    }
+    return false;
+  }
+  hardUnstick(t){
+    // принудительный разъезд: клетка с приоритетом «вниз, к штабу»
+    const cx = bigCell(t.x), cy = bigCell(t.y);
+    const dirs = [[0,1],[0,-1],[1,0],[-1,0]]; // вниз, вверх, вправо, влево
+    let best = null, bestScore = Infinity;
+    for (const [dx, dy] of dirs){
+      const ncx = cx + dx, ncy = cy + dy;
+      if (ncx < 0 || ncy < 0 || ncx >= 13 || ncy >= 13) continue;
+      if (!this.cellFree(ncx, ncy)) continue;
+      if (this.tankAt(ncx, ncy)) continue;
+      const d = (this.dist[ncy] && this.dist[ncy][ncx] !== undefined) ? this.dist[ncy][ncx] : Infinity;
+      const downBias = dy === 1 ? 0 : (dy === -1 ? 4 : 1);
+      const score = (d === Infinity ? 999 : d) + downBias;
+      if (score < bestScore){ bestScore = score; best = { cx: ncx, cy: ncy }; }
+    }
+    if (best) this.goal = best;
+    this.spread = 0;  // никакого блуждания, пока не поедет
+    this.attackT = 0; // не отвлекаться на игрока во время выхода
+    this.escapeT = 1.4;
   }
   brickAhead(){
     const t = this.tank, w = this.world;
