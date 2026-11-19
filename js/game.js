@@ -14,6 +14,8 @@ const MapGen = typeof require !== 'undefined' && typeof window === 'undefined'
 const BONUS_TYPES = ['grenade','helmet','star','shovel','tank','clock'];
 const SPAWN_INTERVAL = 10; // секунд между гибелью врага и появлением замены
 const BONUS_LIFE = 30;     // сколько секунд бонус живёт на поле
+// разные «подходы» к штабу — враги не едут колонной друг за другом
+const APPROACHES = [[6,11],[5,10],[7,10],[4,11],[8,11],[6,9]];
 
 class Game {
   constructor(level, opts){
@@ -112,7 +114,8 @@ class Game {
       fireRate: spec.fireRate, elite: spec.elite, bonusDrop: spec.elite,
       spawnFlash: 2.0, maxBullets: spec.type === 'sniper' ? 2 : 1,
     });
-    const ai = new EnemyAI(this.engine, tank, BASE_CELL, { fireMul: this.budget.fireMul });
+    const approach = APPROACHES[Math.floor(this.rng.next() * APPROACHES.length)];
+    const ai = new EnemyAI(this.engine, tank, BASE_CELL, { fireMul: this.budget.fireMul, approach });
     this.enemyAis.set(tank, ai);
     this.enemiesOnField++;
     this.onSound('spawn');
@@ -136,8 +139,11 @@ class Game {
             this.engine.stats.kills++;
             this.onEvent('explosion', t.x, t.y);
             this.respawnQueue.push(this.time);
+            // взрыв на месте каждого врага, снесённого гранатой
+            this.explosions.push({ x: 16 + t.x + 16, y: 56 + t.y + 16, t0: this.time, dur: 0.8, big: true, seed: Math.random() * 6 });
           }
         }
+        this.onSound('explosion', true);
         break;
       }
       case 'helmet': p.shield = Math.max(p.shield, 10); break;
