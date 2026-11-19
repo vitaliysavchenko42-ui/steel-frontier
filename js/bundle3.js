@@ -1,4 +1,3 @@
-
 /* ===== render.js ===== */
 (function(){
 "use strict";
@@ -162,6 +161,9 @@ function drawSparkle(ctx, sp, time){
   ctx.stroke();
 }
 function drawBonus(ctx, b, time){
+  const age = time - (b.t0 === undefined ? 0 : b.t0);
+  if (age > 27) { if ((time * 8) % 1 < 0.5) return; }      // финальное быстрое мигание
+  else if (age > 22) { if ((time * 4) % 1 < 0.5) return; } // предсмертное мигание
   const bob = Math.sin(time * 5) * 2;
   const x = b.x, y = b.y + bob;
   ctx.fillStyle = 'rgba(20,20,26,0.85)';
@@ -493,7 +495,7 @@ function drawPause(ctx, time){
   ctx.fillText('P — продолжить · ESC — в меню', CANVAS_W/2, CANVAS_H/2 + 22);
   ctx.textAlign = 'left';
 }
-if (typeof window !== 'undefined') Object.assign(window.__TANKS__, { RENDER: { drawTank, drawField, drawHUD, drawIntro, drawMenu, drawLevelSelect, drawStats, drawGameover, drawPause, drawIntroTank, CANVAS_W, CANVAS_H, OFF_X, OFF_Y, ENEMY_COLOR } });
+if (typeof window !== 'undefined') Object.assign(window.__TANKS__, { RENDER: { drawTank, drawField, drawBonus, drawHUD, drawIntro, drawMenu, drawLevelSelect, drawStats, drawGameover, drawPause, drawIntroTank, CANVAS_W, CANVAS_H, OFF_X, OFF_Y, ENEMY_COLOR } });
 })();
 
 /* ===== ui.js ===== */
@@ -539,6 +541,8 @@ class UI {
       onEvent: () => {},
     });
     this.mode = 'playing';
+    if (this.sfx.ensure) this.sfx.ensure();
+    if (this.sfx.resume) this.sfx.resume();
     if (this.sfx.playTheme) this.sfx.playTheme();
   }
   nextLevel(){
@@ -556,7 +560,7 @@ class UI {
     const sfx = this.sfx;
     const confirm = down && (code === 'Space' || code === 'Enter' || code === 'TouchStart');
     if (this.mode === 'intro'){
-      if (confirm){ if (sfx.resume) sfx.resume(); this.mode = 'menu'; }
+      if (confirm){ if (sfx.ensure) sfx.ensure(); if (sfx.resume) sfx.resume(); this.mode = 'menu'; if (sfx.playTheme) sfx.playTheme(); }
       return;
     }
     if (this.mode === 'menu'){
