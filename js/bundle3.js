@@ -34,6 +34,9 @@ function drawTank(ctx, cx, cy, dir, style, t){
   ctx.save();
   ctx.translate(cx, cy);
   ctx.rotate(dir * Math.PI / 2);
+  // тень под танком — объём
+  ctx.fillStyle = 'rgba(0,0,0,0.22)';
+  ctx.fillRect(-s/2 - 1, -s/2 + 5, s + 2, s - 3);
   const palette = isP
     ? { body: '#4d7a3a', body2: '#3a5c2b', tracks: '#2b2b2b', barrel: '#8a8a8a', accent: '#c8b06a' }
     : et === 'fast'   ? { body: '#49c2d4', body2: '#2a8fa0', tracks: '#1e1e1e', barrel: '#c8f2f8', accent: '#0e5a66' }
@@ -50,6 +53,9 @@ function drawTank(ctx, cx, cy, dir, style, t){
   }
   ctx.fillStyle = palette.body;
   ctx.fillRect(-s/2 + 7, -s/2 + 3, s - 14, s - 6);
+  // солнечный блик на верхней кромке корпуса
+  ctx.fillStyle = 'rgba(255,255,255,0.16)';
+  ctx.fillRect(-s/2 + 7, -s/2 + 3, s - 14, 3);
   ctx.fillStyle = palette.body2;
   ctx.beginPath();
   ctx.moveTo(-s/2 + 7, -s/2 + 3);
@@ -63,7 +69,6 @@ function drawTank(ctx, cx, cy, dir, style, t){
   ctx.fillStyle = palette.body;
   roundRect(ctx, -5.5, -5.5, 11, 11, 3.5); ctx.fill();
   if (et === 'fast'){
-    // окраска «БТР» по остатку брони: голубой (3) → охра (2) → серый (1)
     const hpStage = (t && t.hp !== undefined) ? t.hp : 3;
     if (hpStage <= 1){ palette.body = '#8d8d8d'; palette.body2 = '#6f6f6f'; palette.accent = '#4a4a4a'; }
     else if (hpStage === 2){ palette.body = '#d4b13a'; palette.body2 = '#a3851f'; palette.accent = '#5a4810'; }
@@ -73,23 +78,19 @@ function drawTank(ctx, cx, cy, dir, style, t){
     roundRect(ctx, -7, -7, 14, 14, 4); ctx.fill();
     ctx.fillStyle = palette.body;
     roundRect(ctx, -5.5, -5.5, 11, 11, 3.5); ctx.fill();
-    // клин корпуса
     ctx.fillStyle = 'rgba(0,0,0,0.30)';
     ctx.beginPath();
     ctx.moveTo(-s/2 + 7, -s/2 + 3);
     ctx.lineTo(s/2 - 7, -s/2 + 3);
     ctx.lineTo(0, s/2 - 2);
     ctx.closePath(); ctx.fill();
-    // катки БТР: прямоугольные диски по бокам корпуса
     ctx.fillStyle = '#1a1a1a';
     for (const wx of [-s/2 + 1, -s/2 + 9, s/2 - 15, s/2 - 7]){
       ctx.fillRect(wx, s/2 - 6, 7, 5);
     }
-    // воздухозаборники сзади
     ctx.fillStyle = '#111';
     ctx.fillRect(-s/2 + 8, s/2 - 10, 5, 4);
     ctx.fillRect(s/2 - 13, s/2 - 10, 5, 4);
-    // антенна
     ctx.strokeStyle = palette.accent; ctx.lineWidth = 1.2;
     ctx.beginPath(); ctx.moveTo(-4, -3); ctx.lineTo(-7, -s/2 + 4); ctx.stroke();
   } else if (et === 'armor'){
@@ -129,13 +130,11 @@ function drawTank(ctx, cx, cy, dir, style, t){
     ctx.fillStyle = '#7fdcff';
     ctx.beginPath(); ctx.arc(0, -2, 1.8, 0, 7); ctx.fill();
   } else if (et === 'fast'){
-    // «БТР»: короткая башня-пушка поверх приплюснутого корпуса
     ctx.fillStyle = palette.barrel;
     ctx.fillRect(-1.5, -TANK/2 - 2, 3, TANK/2 - 2);
     ctx.fillStyle = '#0e5a66';
     ctx.fillRect(-4, -3, 8, 6);
   } else {
-    // обычный враг: ствол заметно длиннее — как в оригинале
     ctx.fillStyle = palette.barrel;
     ctx.fillRect(-1.5, -TANK/2 - 6, 3, TANK/2 - 1);
   }
@@ -269,8 +268,8 @@ const BONUS_ICONS = {
 };
 function drawBonus(ctx, b, time){
   const age = time - (b.t0 === undefined ? 0 : b.t0);
-  if (age > 27) { if ((time * 8) % 1 < 0.5) return; }      // финальное быстрое мигание
-  else if (age > 22) { if ((time * 4) % 1 < 0.5) return; } // предсмертное мигание
+  if (age > 27) { if ((time * 8) % 1 < 0.5) return; }
+  else if (age > 22) { if ((time * 4) % 1 < 0.5) return; }
   const bob = Math.sin(time * 5) * 2;
   const x = OFF_X + b.x, y = OFF_Y + b.y + bob;
   const cx = x + b.w/2, cy = y + b.h/2;
@@ -339,7 +338,6 @@ function drawBonus(ctx, b, time){
       ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + 3.4, cy); ctx.stroke();
       break;
     case 'raft':
-      // плот: крест из двух досок + волна
       ctx.fillStyle = '#8d6e63';
       ctx.fillRect(cx - 6.5, cy - 1.5, 13, 3);
       ctx.fillRect(cx - 1.5, cy - 6.5, 3, 13);
@@ -401,8 +399,13 @@ function drawField(ctx, game, time){
   }
   for (const b of game.engine.bonuses) drawBonus(ctx, b, time);
   const fx = OFF_X + FLAGT[0] * CELL, fy = OFF_Y + FLAGT[1] * CELL;
-  if (tiles[FLAGT[1]][FLAGT[0]] === T.FLAG) drawFlag(ctx, fx, fy, time);
-  else {
+  if (tiles[FLAGT[1]][FLAGT[0]] === T.FLAG){
+    // сияние вокруг штаба — флаг заметен издалека
+    const glow = 0.5 + 0.5 * Math.sin(time * 3);
+    ctx.fillStyle = 'rgba(255,214,120,' + (0.05 + 0.07 * glow).toFixed(3) + ')';
+    ctx.beginPath(); ctx.arc(fx + 16, fy + 16, 30, 0, 7); ctx.fill();
+    drawFlag(ctx, fx, fy, time);
+  } else {
     ctx.fillStyle = '#555';
     ctx.fillRect(fx + 4, fy + 10, 24, 22);
     ctx.fillStyle = '#777';
@@ -756,7 +759,6 @@ class UI {
     }
     if (this.mode === 'menu'){
       if (this.menu.recordsOpen){
-        // просмотр рекордов: ОГОНЬ/пробел — назад
         if (confirm) this.menu.recordsOpen = false;
         return;
       }
@@ -833,7 +835,7 @@ if (typeof window !== 'undefined') Object.assign(window.__TANKS__, { UI, UI_HELP
   window.__SF = { ui, sfx };
   let last = performance.now();
   const keys = new Set();
-  let lastDir = null; // приоритет последнего направления
+  let lastDir = null;
   const HOLD_KEYS = ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','KeyW','KeyA','KeyS','KeyD','Space'];
   window.addEventListener('keydown', (e) => {
     if (HOLD_KEYS.includes(e.code)) e.preventDefault();
@@ -861,7 +863,6 @@ if (typeof window !== 'undefined') Object.assign(window.__TANKS__, { UI, UI_HELP
     ui.update(dt, keys);
     if (ui.mode === 'playing' && ui.game){
       const input = {};
-      // приоритет последнего направления: танк не мечется при одновременных клавишах
       const DIR_KEY = { ArrowUp: 0, KeyW: 0, ArrowRight: 1, KeyD: 1, ArrowDown: 2, KeyS: 2, ArrowLeft: 3, KeyA: 3 };
       let dir = null;
       if (lastDir !== null){
