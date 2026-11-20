@@ -166,7 +166,7 @@ class Engine {
         }
         for (const t of this.tanks){
           if (!t.alive || t === b.owner) continue;
-          if (!b.fromPlayer && !t.isPlayer) continue;
+          // вражеские пули тоже бьют врагов (как в классике) — заторы разрешаются стрельбой
           if (b.x < t.x + TANK && b.x + b.w > t.x && b.y < t.y + TANK && b.y + b.h > t.y){
             if (t.shield > 0){ b.alive = false; break; }
             t.hp -= b.power;

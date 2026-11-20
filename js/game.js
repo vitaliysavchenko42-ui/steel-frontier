@@ -12,7 +12,7 @@ const MapGen = typeof require !== 'undefined' && typeof window === 'undefined'
   ? require('./mapgen') : window.__TANKS__.MapGen;
 
 const BONUS_TYPES = ['grenade','helmet','star','shovel','tank','clock'];
-const SPAWN_INTERVAL = 5; // секунд между гибелью врага и появлением замены
+const SPAWN_INTERVAL = 3; // секунд между гибелью врага и появлением замены
 const BONUS_LIFE = 30;     // сколько секунд бонус живёт на поле
 // разные «подходы» к штабу — враги не едут колонной друг за другом
 const APPROACHES = [[6,11],[5,10],[7,10],[4,11],[8,11],[6,9]];
