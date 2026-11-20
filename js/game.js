@@ -11,7 +11,7 @@ const { makeRng } = typeof require !== 'undefined' && typeof window === 'undefin
 const MapGen = typeof require !== 'undefined' && typeof window === 'undefined'
   ? require('./mapgen') : window.__TANKS__.MapGen;
 
-const BONUS_TYPES = ['grenade','helmet','star','shovel','tank','clock'];
+const BONUS_TYPES = ['grenade','helmet','star','shovel','tank','clock','raft'];
 const SPAWN_INTERVAL = 3; // секунд между гибелью врага и появлением замены
 const BONUS_LIFE = 30;     // сколько секунд бонус живёт на поле
 // разные «подходы» к штабу — враги не едут колонной друг за другом
@@ -123,7 +123,7 @@ class Game {
     });
     const approach = APPROACHES[Math.floor(this.rng.next() * APPROACHES.length)];
     this.spawnIdx = (spot.idx + 1) % ENEMY_CELLS.length;
-    const ai = new EnemyAI(this.engine, tank, BASE_CELL, { fireMul: this.budget.fireMul, approach });
+    const ai = new EnemyAI(this.engine, tank, BASE_CELL, { fireMul: this.budget.fireMul, approach, fireRate: spec.fireRate });
     this.enemyAis.set(tank, ai);
     this.enemiesOnField++;
     this.onSound('spawn');
@@ -177,6 +177,8 @@ class Game {
         break;
       }
       case 'tank': this.lives++; break;
+      // «лодка» (как в оригинале): танк переплывает воду до конца уровня
+      case 'raft': p.raft = true; break;
       case 'clock': this.freezeTimer = 8; for (const t of this.engine.tanks) if (!t.isPlayer) t.frozen = 8; break;
     }
   }
