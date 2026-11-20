@@ -240,7 +240,7 @@ function drawSparkle(ctx, sp, time){
 }
 const BONUS_ICONS = {
   grenade: '#9ccc3d', helmet: '#4fc3f7', star: '#ffe082',
-  shovel: '#cfd8dc', tank: '#66bb6a', clock: '#f5f5f5',
+  shovel: '#cfd8dc', tank: '#66bb6a', clock: '#f5f5f5', raft: '#8d6e63',
 };
 function drawBonus(ctx, b, time){
   const age = time - (b.t0 === undefined ? 0 : b.t0);
@@ -312,6 +312,20 @@ function drawBonus(ctx, b, time){
       ctx.strokeStyle = '#37474f'; ctx.lineWidth = 1.6;
       ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx, cy - 4.2); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + 3.4, cy); ctx.stroke();
+      break;
+    case 'raft':
+      // плот: крест из двух досок + волна
+      ctx.fillStyle = '#8d6e63';
+      ctx.fillRect(cx - 6.5, cy - 1.5, 13, 3);
+      ctx.fillRect(cx - 1.5, cy - 6.5, 3, 13);
+      ctx.fillStyle = '#5d4037';
+      ctx.fillRect(cx - 6.5, cy - 1.5, 13, 0.8);
+      ctx.fillRect(cx - 1.5, cy - 6.5, 0.8, 13);
+      ctx.strokeStyle = 'rgba(120,200,255,0.8)'; ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(cx - 6, cy + 7.5); ctx.lineTo(cx - 2, cy + 6);
+      ctx.lineTo(cx + 2, cy + 7.5); ctx.lineTo(cx + 6, cy + 6);
+      ctx.stroke();
       break;
   }
 }
