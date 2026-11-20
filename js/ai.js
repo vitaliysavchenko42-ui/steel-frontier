@@ -120,13 +120,24 @@ class EnemyAI {
     if (sight && this.attackT <= 0 && rand() < 0.65) this.attackT = this.p.attackOnSight * (0.5 + rand()*0.7);
     if (this.attackT > 0){
       this.attackT -= dt;
-      targetDir = sight === 'horiz' ? (w.playerX > t.x ? DIR.RIGHT : DIR.LEFT)
-                : sight === 'vert'  ? (w.playerY > t.y ? DIR.DOWN : DIR.UP) : t.dir;
+      // направление атаки фиксируется на время атаки — дуло не крутится каждый кадр
+      if (sight){
+        this.attackDir = sight === 'horiz' ? (w.playerX > t.x ? DIR.RIGHT : DIR.LEFT)
+                       : (w.playerY > t.y ? DIR.DOWN : DIR.UP);
+      } else {
+        this.attackT = 0; this.attackDir = undefined; // потерял цель — выходим из атаки
+      }
+      if (this.attackDir !== undefined) targetDir = this.attackDir;
     } else if (this.goal){
       const c = centerOfBig(this.goal.cx, this.goal.cy);
       const dx = c.x - t.x, dy = c.y - t.y;
       if (Math.abs(dx) < 2 && Math.abs(dy) < 2) this.pickGoal();
-      targetDir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? DIR.RIGHT : DIR.LEFT) : (dy > 0 ? DIR.DOWN : DIR.UP);
+      // инерция: не поворачиваем, пока текущее направление ведёт к цели — иначе «стрелочки по кругу»
+      const cur = DIRV[t.dir];
+      const curGood = (cur[0] !== 0 && cur[0] === Math.sign(dx) && Math.abs(dx) > 2)
+                   || (cur[1] !== 0 && cur[1] === Math.sign(dy) && Math.abs(dy) > 2);
+      if (!curGood)
+        targetDir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? DIR.RIGHT : DIR.LEFT) : (dy > 0 ? DIR.DOWN : DIR.UP);
     }
     w.moveTank(t, targetDir, dt);
     let goalDist = Infinity;
@@ -162,6 +173,7 @@ class EnemyAI {
     }
     if (best) this.goal = best;
     this.spread = 0;  // никакого блуждания, пока не поедет
+    this.attackDir = undefined;
     this.attackT = 0; // не отвлекаться на игрока во время выхода
     this.escapeT = 1.4;
   }
