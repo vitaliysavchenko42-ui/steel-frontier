@@ -12,7 +12,7 @@ function rectHitsTiles(x, y, w, h, tiles, predicate){
     if (predicate(tiles[ty][tx])) return { tx, ty };
   return null;
 }
-const SOLID_FOR_TANK = (v) => v === T.BRICK || v === T.STEEL || v === T.WATER;
+const SOLID_FOR_TANK = (v) => v === T.BRICK || v === T.STEEL || v === T.WATER || v === T.FLAG || v === T.BASEWALL;
 const SOLID_FOR_BULLET = (v) => v === T.BRICK || v === T.STEEL || v === T.FLAG;
 
 class Engine {
@@ -224,7 +224,7 @@ class EnemyAI {
   cellFree(bx, by){
     for (let sy = 0; sy < 2; sy++) for (let sx = 0; sx < 2; sx++){
       const v = this.world.tiles[by*2+sy][bx*2+sx];
-      if (v === T.STEEL || v === T.WATER) return false;
+      if (v === T.STEEL || v === T.WATER || v === T.FLAG || v === T.BASEWALL) return false;
     }
     return true;
   }
@@ -420,6 +420,8 @@ class Game {
     E.onShot = (tank) => this.onSound('shoot', !!tank.isPlayer);
     E.onHit = (x, y, kind) => {
       if (kind === 'steel') this.onSound('ricochet');
+      if (kind === 'tank') this.onSound('hit'); // «пим» — попадание в броню (как в оригинале)
+      if (kind === 'base' && typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([80, 60, 80]);
       if (kind === 'base'){
         // штаб подбит: большой взрыв + звук
         this.onSound('baseDestroyed');
@@ -578,6 +580,10 @@ class Game {
     const p = this.player;
     p.alive = false;
     this.lives--;
+    // звёзды сбрасываются при смерти (как в оригинале): обычный танк, одна пуля
+    this.playerPower = 1;
+    // вибрация при гибели танка игрока (мобильные)
+    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(200);
     this.onSound('playerDeath');
     this.onEvent('explosion', p.x, p.y);
     if (this.lives <= 0){
@@ -741,6 +747,7 @@ class SFX {
   }
   shoot(player){ this.playTone(player ? 560 : 420, 0.14, 'square', 0.28, 90); this.playNoise(0.10, 5000, 500, 0.30); this.playTone(player ? 170 : 130, 0.11, 'triangle', 0.20, 55); }
   ricochet(){ this.playTone(900, 0.05, 'triangle', 0.1, 500); }
+  hit(){ this.playTone(880, 0.09, 'square', 0.24, 440); this.playNoise(0.07, 3600, 700, 0.2); } // «пим» — попадание в броню
   explosion(big){
     // громкий слоёный взрыв: крах + низкий гул + подкат
     this.playNoise(big ? 0.9 : 0.5, big ? 1200 : 2200, 50, big ? 0.85 : 0.6);
