@@ -250,13 +250,28 @@ class EnemyAI {
       if (this.world.tiles[by*2+sy][bx*2+sx] === T.BRICK) return true;
     return false;
   }
+  lineClear(x1, y1, x2, y2){
+    // линия видимости: между центрами не должно быть кирпича/стали/воды
+    const dx = x2 - x1, dy = y2 - y1;
+    const steps = Math.max(1, Math.ceil((Math.abs(dx) + Math.abs(dy)) / CELL));
+    for (let i = 1; i < steps; i++){
+      const px = x1 + dx * (i / steps), py = y1 + dy * (i / steps);
+      const tx = Math.floor(px / CELL), ty = Math.floor(py / CELL);
+      if (ty < 0 || ty >= 26 || tx < 0 || tx >= 26) return false;
+      const v = this.world.tiles[ty][tx];
+      if (v === T.BRICK || v === T.STEEL || v === T.WATER) return false;
+    }
+    return true;
+  }
   seesPlayer(){
     const w = this.world;
     if (w.playerX === undefined) return false;
     const t = this.tank;
     const cx = t.x + TANK/2, cy = t.y + TANK/2;
-    if (Math.abs(w.playerY - cy) < TANK/2 + CELL*0.5 && Math.abs(w.playerX - cx) < 11*CELL) return 'horiz';
-    if (Math.abs(w.playerX - cx) < TANK/2 + CELL*0.5 && Math.abs(w.playerY - cy) < 11*CELL) return 'vert';
+    const horiz = Math.abs(w.playerY - cy) < TANK/2 + CELL*0.5 && Math.abs(w.playerX - cx) < 11*CELL;
+    const vert  = Math.abs(w.playerX - cx) < TANK/2 + CELL*0.5 && Math.abs(w.playerY - cy) < 11*CELL;
+    if (horiz && this.lineClear(cx, cy, w.playerX, cy)) return 'horiz';
+    if (vert && this.lineClear(cx, cy, cx, w.playerY)) return 'vert';
     return false;
   }
   step(dt){
@@ -382,17 +397,19 @@ class Game {
     this.onEvent = opts.onEvent || function(){};
     this.state = 'playing';
     this.lives = opts.lives || 3;
+    // звёзды переносятся на новый уровень через opts.playerPower — ДО создания танка
+    this.playerPower = opts.playerPower || 1;
     this.time = 0; this.levelTime = 0;
     this.enemiesRemaining = this.budget.total;
     this.spawnQueue = [];
     this.enemiesOnField = 0;
     this.enemyAis = new Map();
     this.spawnIdx = 0; // последовательный обход точек спавна
+    this.lastSpawnAt = -999; // время последнего спавна: из очереди — не чаще раза в SPAWN_INTERVAL
     this.respawnQueue = []; // моменты гибели врагов: замена через SPAWN_INTERVAL
     this.baseShovel = 0;
     this.freezeTimer = 0;
     this.stats = { kills:0, score:0, bonuses:0, time:0 };
-    this.playerPower = 1;
     this.explosions = [];
     this.sparkles = [];
     this.startLevel();
@@ -453,13 +470,15 @@ class Game {
     this.enemiesRemaining -= spawnedNow;
   }
   nextEnemyCell(){
-    // строго последовательный порядок: замена выходит только на следующую точку по кругу
-    const idx = this.spawnIdx % ENEMY_CELLS.length;
-    const [cx, cy] = ENEMY_CELLS[idx];
-    const [x, y] = cellPx(cx, cy);
-    const occupied = this.engine.tanks.some(t => t.alive && Math.abs(t.x - x) < 40 && Math.abs(t.y - y) < 40);
-    if (occupied) return null;
-    return { x, y, cx, cy, idx };
+    // последовательный порядок по кругу: занятая точка (в т.ч. игроком) пропускается
+    for (let i = 0; i < ENEMY_CELLS.length; i++){
+      const idx = (this.spawnIdx + i) % ENEMY_CELLS.length;
+      const [cx, cy] = ENEMY_CELLS[idx];
+      const [x, y] = cellPx(cx, cy);
+      const occupied = this.engine.tanks.some(t => t.alive && Math.abs(t.x - x) < 40 && Math.abs(t.y - y) < 40);
+      if (!occupied) return { x, y, cx, cy, idx };
+    }
+    return null; // все три точки заняты — ждём
   }
   spawnEnemy(){
     const spot = this.nextEnemyCell();
@@ -580,10 +599,11 @@ class Game {
       if (this.respawnQueue.length === 0){
         // очередь пуста, а на поле меньше трёх — спавним сразу
         if (this.spawnEnemy()) this.enemiesRemaining--;
-      } else if (this.time - this.respawnQueue[0] >= SPAWN_INTERVAL){
+      } else if (this.time - this.respawnQueue[0] >= SPAWN_INTERVAL && this.time - this.lastSpawnAt >= SPAWN_INTERVAL){
         if (this.spawnEnemy()){
           this.enemiesRemaining--;
           this.respawnQueue.shift();
+          this.lastSpawnAt = this.time;
         }
       }
     }
