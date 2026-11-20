@@ -659,11 +659,12 @@ class UI {
     this.game = null;
     this.pendingStats = null;
   }
-  startGame(level){
+  startGame(level, power){
     const G = C.Game;
     this.game = new G(level, {
       onSound: (name) => { if (this.sfx[name]) this.sfx[name](); },
       onEvent: () => {},
+      playerPower: power,
     });
     this.mode = 'playing';
     if (this.sfx.ensure) this.sfx.ensure();
@@ -676,9 +677,8 @@ class UI {
     const lives = old.lives;
     const power = old.playerPower;
     const level = old.level + 1;
-    this.startGame(level);
+    this.startGame(level, power);
     this.game.engine.stats.score = score;
-    this.game.playerPower = power;
     this.game.lives = lives;
   }
   onKey(code, down){
