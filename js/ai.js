@@ -59,13 +59,28 @@ class EnemyAI {
       if (this.world.tiles[by*2+sy][bx*2+sx] === T.BRICK) return true;
     return false;
   }
+  lineClear(x1, y1, x2, y2){
+    // линия видимости: между центрами не должно быть кирпича/стали/воды
+    const dx = x2 - x1, dy = y2 - y1;
+    const steps = Math.max(1, Math.ceil((Math.abs(dx) + Math.abs(dy)) / CELL));
+    for (let i = 1; i < steps; i++){
+      const px = x1 + dx * (i / steps), py = y1 + dy * (i / steps);
+      const tx = Math.floor(px / CELL), ty = Math.floor(py / CELL);
+      if (ty < 0 || ty >= 26 || tx < 0 || tx >= 26) return false;
+      const v = this.world.tiles[ty][tx];
+      if (v === T.BRICK || v === T.STEEL || v === T.WATER) return false;
+    }
+    return true;
+  }
   seesPlayer(){
     const w = this.world;
     if (w.playerX === undefined) return false;
     const t = this.tank;
     const cx = t.x + TANK/2, cy = t.y + TANK/2;
-    if (Math.abs(w.playerY - cy) < TANK/2 + CELL*0.5 && Math.abs(w.playerX - cx) < 11*CELL) return 'horiz';
-    if (Math.abs(w.playerX - cx) < TANK/2 + CELL*0.5 && Math.abs(w.playerY - cy) < 11*CELL) return 'vert';
+    const horiz = Math.abs(w.playerY - cy) < TANK/2 + CELL*0.5 && Math.abs(w.playerX - cx) < 11*CELL;
+    const vert  = Math.abs(w.playerX - cx) < TANK/2 + CELL*0.5 && Math.abs(w.playerY - cy) < 11*CELL;
+    if (horiz && this.lineClear(cx, cy, w.playerX, cy)) return 'horiz';
+    if (vert && this.lineClear(cx, cy, cx, w.playerY)) return 'vert';
     return false;
   }
   step(dt){
