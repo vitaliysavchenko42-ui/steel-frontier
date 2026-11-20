@@ -37,7 +37,6 @@ class Engine {
     const nx = tank.x + dx * tank.speed * dt;
     const ny = tank.y + dy * tank.speed * dt;
     if (nx < 0 || ny < 0 || nx + TANK > W || ny + TANK > H) return false;
-    // с бонусом «лодка» танк переплывает воду (как в оригинале)
     const solid = (tank.raft && tank.raft > 0)
       ? (v) => v === T.BRICK || v === T.STEEL
       : SOLID_FOR_TANK;
@@ -81,7 +80,6 @@ class Engine {
     tank.fireCd = tank.fireRate;
     const [dx, dy] = DIRV[tank.dir];
     const bw = 6;
-    // пуля вылетает с кончика ствола; у снайпера ствол длиннее
     const nose = (tank.type === 'sniper') ? TANK/2 + 8 : TANK/2 + 4;
     let bx = tank.x + TANK/2 - bw/2 + dx * nose;
     let by = tank.y + TANK/2 - bw/2 + dy * nose;
@@ -123,7 +121,6 @@ class Engine {
       } return false;
     }
     if (v === T.FLAG) {
-      // попадание в штаб: флаг уничтожен целиком
       for (let fy = FLAG[1]; fy <= FLAG[3]; fy++) for (let fx2 = FLAG[0]; fx2 <= FLAG[2]; fx2++)
         if (this.tiles[fy][fx2] === T.FLAG) this.tiles[fy][fx2] = T.FLAGDEAD;
       return true;
@@ -147,7 +144,6 @@ class Engine {
       for (let s = 0; s < steps && b.alive; s++){
         b.x += dx * sd; b.y += dy * sd;
         if (b.x < 0 || b.y < 0 || b.x + b.w > W || b.y + b.h > H){ b.alive = false; break; }
-        // столкновение пуль на каждом подшаге — иначе пули проскакивают друг мимо друга
         for (const o of this.bullets){
           if (o === b || !o.alive) continue;
           if (b.fromPlayer !== o.fromPlayer &&
@@ -171,7 +167,7 @@ class Engine {
         }
         for (const t of this.tanks){
           if (!t.alive || t === b.owner) continue;
-          if (!b.fromPlayer && !t.isPlayer) continue; // свои свои не бьют — как в оригинале
+          if (!b.fromPlayer && !t.isPlayer) continue;
           if (b.x < t.x + TANK && b.x + b.w > t.x && b.y < t.y + TANK && b.y + b.h > t.y){
             if (t.shield > 0){ b.alive = false; break; }
             t.hp -= b.power;
@@ -208,17 +204,16 @@ class EnemyAI {
     this.world = world; this.tank = tank;
     this.basePos = basePos || [6, 11];
     this.p = Object.assign({ fireMul: 1, attackOnSight: 3.0 }, params || {});
-    // подходная точка: враги идут к штабу разными дорогами
     this.approach = this.p.approach || null;
     this.spread = 1 + rand() * 2;
     this.dist = this.approach ? computeFieldTo(this.world.tiles, this.approach) : computeField(this.world.tiles);
     this.goal = null;
-    this.fireTimer = 1.0; // регулярная стрельба: каждые fireRate сек (±20%) — как в оригинале
+    this.fireTimer = 1.0;
     this.replanCd = 2 + rand();
     this.stuck = 0; this.lastX = tank.x; this.lastY = tank.y;
     this.stuckWindow = 0; this.winX = undefined; this.winY = undefined;
-    this.escapeT = 0; // таймер выхода из тупика
-    this.moveFailed = false; // не поехал в прошлом кадре — инерция отменяется
+    this.escapeT = 0;
+    this.moveFailed = false;
   }
   refreshField(){ this.dist = this.approach ? computeFieldTo(this.world.tiles, this.approach) : computeField(this.world.tiles); }
   cellFree(bx, by){
@@ -244,7 +239,6 @@ class EnemyAI {
     if (best === null || bestD === Infinity){
       best = pool.length ? pool[Math.floor(rand() * pool.length)] : { cx, cy };
     } else {
-      // «разъезд»: иногда выбираем не самый короткий путь, а один из почти равных
       const near = pool.filter(c => this.dist[c.cy][c.cx] <= bestD + this.spread);
       if (near.length > 1 && this.spread > 0 && rand() < 0.45) best = near[Math.floor(rand() * near.length)];
     }
@@ -255,8 +249,6 @@ class EnemyAI {
       if (this.world.tiles[by*2+sy][bx*2+sx] === T.BRICK) return true;
     return false;
   }
-  // (механика оригинала: у врагов нет «зрения» — они едут к штабу по своему алгоритму
-  //  и стреляют вперёд по своему курсу с рандомной регулярностью)
   step(dt){
     const t = this.tank, w = this.world;
     if (!t.alive || t.frozen > 0) return;
@@ -266,7 +258,6 @@ class EnemyAI {
     if (Math.abs(t.x - this.lastX) < 1 && Math.abs(t.y - this.lastY) < 1) this.stuck += dt;
     else this.stuck = 0;
     this.lastX = t.x; this.lastY = t.y;
-    // анти-топтание: не стоять на месте дольше ~2с — принудительный разъезд
     this.stuckWindow += dt;
     if (this.stuckWindow >= 2){
       const moved = Math.abs(t.x - (this.winX === undefined ? t.x : this.winX))
@@ -293,7 +284,6 @@ class EnemyAI {
       const c = centerOfBig(this.goal.cx, this.goal.cy);
       const dx = c.x - t.x, dy = c.y - t.y;
       if (Math.abs(dx) < 2 && Math.abs(dy) < 2){
-        // дошёл до цели: если это штаб — стрелять по флагу вниз (как в оригинале — «штаб пал»)
         const gd = this.dist[this.goal.cy] ? this.dist[this.goal.cy][this.goal.cx] : 0;
         if (gd === 0){
           t.dir = DIR.DOWN;
@@ -303,14 +293,12 @@ class EnemyAI {
         }
         this.pickGoal();
       }
-      // инерция: держим направление, пока оно ведёт к цели И танк реально едет;
-      // если прошлый moveTank упёрся в стену/танк — инерция отменяется
       const cur = DIRV[t.dir];
       const curGood = !this.moveFailed && ((cur[0] !== 0 && cur[0] === Math.sign(dx) && Math.abs(dx) > 2)
                    || (cur[1] !== 0 && cur[1] === Math.sign(dy) && Math.abs(dy) > 2));
       if (!curGood)
         targetDir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? DIR.RIGHT : DIR.LEFT) : (dy > 0 ? DIR.DOWN : DIR.UP);
-      this.moveFailed = false; // повторно проставится после w.moveTank ниже
+      this.moveFailed = false;
     }
     w.moveTank(t, targetDir, dt);
     if (!t.moving) this.moveFailed = true;
@@ -319,13 +307,11 @@ class EnemyAI {
       const c = centerOfBig(this.goal.cx, this.goal.cy);
       goalDist = Math.abs(t.x - c.x) + Math.abs(t.y - c.y);
     }
-    // регулярная рандомная стрельба по курсу (как в оригинале)
     this.fireTimer -= dt;
     if (this.fireTimer <= 0){
       this.fireTimer = (this.p.fireRate || 1.0) * (0.8 + rand() * 0.4);
       if (rand() < 0.75) w.fire(t);
     }
-    // стены на пути к штабу враги ломают, как в оригинале
     if (this.goal && this.isBrickCell(this.goal.cx, this.goal.cy) && goalDist < 64 && t.fireCd <= 0 && rand() < 0.5)
       w.fire(t);
     else if (this.brickAhead() && t.fireCd <= 0 && rand() < 0.5)
@@ -340,9 +326,8 @@ class EnemyAI {
     return false;
   }
   hardUnstick(t){
-    // принудительный разъезд: клетка с приоритетом «вниз, к штабу»
     const cx = bigCell(t.x), cy = bigCell(t.y);
-    const dirs = [[0,1],[0,-1],[1,0],[-1,0]]; // вниз, вверх, вправо, влево
+    const dirs = [[0,1],[0,-1],[1,0],[-1,0]];
     let best = null, bestScore = Infinity;
     for (const [dx, dy] of dirs){
       const ncx = cx + dx, ncy = cy + dy;
@@ -355,8 +340,8 @@ class EnemyAI {
       if (score < bestScore){ bestScore = score; best = { cx: ncx, cy: ncy }; }
     }
     if (best) this.goal = best;
-    this.spread = 0;  // никакого блуждания, пока не поедет
-    this.fireTimer = Math.max(this.fireTimer, 1.0); // после выхода не палить сразу
+    this.spread = 0;
+    this.fireTimer = Math.max(this.fireTimer, 1.0);
     this.escapeT = 1.4;
   }
   brickAhead(){
@@ -385,9 +370,8 @@ const { EnemyAI } = C;
 const { makeRng } = C;
 
 const BONUS_TYPES = ['grenade','helmet','star','shovel','tank','clock','raft'];
-const SPAWN_INTERVAL = 3; // секунд между гибелью врага и появлением замены
-const BONUS_LIFE = 30;     // сколько секунд бонус живёт на поле
-// разные «подходы» к штабу — враги не едут колонной друг за другом
+const SPAWN_INTERVAL = 3;
+const BONUS_LIFE = 30;
 const APPROACHES = [[6,11],[5,10],[7,10],[4,11],[8,11],[6,9]];
 
 class Game {
@@ -400,16 +384,15 @@ class Game {
     this.onEvent = opts.onEvent || function(){};
     this.state = 'playing';
     this.lives = opts.lives || 3;
-    // звёзды переносятся на новый уровень через opts.playerPower — ДО создания танка
     this.playerPower = opts.playerPower || 1;
     this.time = 0; this.levelTime = 0;
     this.enemiesRemaining = this.budget.total;
     this.spawnQueue = [];
     this.enemiesOnField = 0;
     this.enemyAis = new Map();
-    this.spawnIdx = 0; // последовательный обход точек спавна
-    this.lastSpawnAt = -999; // время последнего спавна: из очереди — не чаще раза в SPAWN_INTERVAL
-    this.respawnQueue = []; // моменты гибели врагов: замена через SPAWN_INTERVAL
+    this.spawnIdx = 0;
+    this.lastSpawnAt = -999;
+    this.respawnQueue = [];
     this.baseShovel = 0;
     this.freezeTimer = 0;
     this.stats = { kills:0, score:0, bonuses:0, time:0 };
@@ -420,10 +403,9 @@ class Game {
     E.onShot = (tank) => this.onSound('shoot', !!tank.isPlayer);
     E.onHit = (x, y, kind) => {
       if (kind === 'steel') this.onSound('ricochet');
-      if (kind === 'tank') this.onSound('hit'); // «пим» — попадание в броню (как в оригинале)
-      if (kind === 'base' && typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([80, 60, 80]);
+      if (kind === 'tank') this.onSound('hit');
+      if (kind === 'base' && typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([100, 60, 100]);
       if (kind === 'base'){
-        // штаб подбит: большой взрыв + звук
         this.onSound('baseDestroyed');
         this.explosions.push({ x: 16 + x, y: 56 + y, t0: this.time, dur: 1.4, big: true, seed: Math.random() * 6 });
       }
@@ -436,6 +418,8 @@ class Game {
     E.onDeath = (t) => {
       this.explosions.push({ x: 16 + t.x + 16, y: 56 + t.y + 16, t0: this.time,
         dur: t.isPlayer ? 0.9 : 0.55, big: t.isPlayer || t.type === 'armor', seed: Math.random() * 6 });
+      // вибрация при гибели танка игрока — дублируем на двух уровнях, чтобы не потерять
+      if (t.isPlayer && typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([150, 60, 150]);
       if (!t.isPlayer){ this.onSound('explosion', false); this.respawnQueue.push(this.time); }
     };
   }
@@ -469,13 +453,11 @@ class Game {
     }
     this.enemiesRemaining = this.spawnQueue.length;
     this.levelTime = 0;
-    // старт: сразу три врага (углы + середина верхней кромки)
     let spawnedNow = 0;
     for (let s = 0; s < 3; s++) if (this.spawnEnemy()) spawnedNow++;
     this.enemiesRemaining -= spawnedNow;
   }
   nextEnemyCell(){
-    // последовательный порядок по кругу: занятая точка (в т.ч. игроком) пропускается
     for (let i = 0; i < ENEMY_CELLS.length; i++){
       const idx = (this.spawnIdx + i) % ENEMY_CELLS.length;
       const [cx, cy] = ENEMY_CELLS[idx];
@@ -483,7 +465,7 @@ class Game {
       const occupied = this.engine.tanks.some(t => t.alive && Math.abs(t.x - x) < 40 && Math.abs(t.y - y) < 40);
       if (!occupied) return { x, y, cx, cy, idx };
     }
-    return null; // все три точки заняты — ждём
+    return null;
   }
   spawnEnemy(){
     const spot = this.nextEnemyCell();
@@ -522,7 +504,6 @@ class Game {
             this.engine.stats.kills++;
             this.onEvent('explosion', t.x, t.y);
             this.respawnQueue.push(this.time);
-            // взрыв на месте каждого врага, снесённого гранатой
             this.explosions.push({ x: 16 + t.x + 16, y: 56 + t.y + 16, t0: this.time, dur: 0.8, big: true, seed: Math.random() * 6 });
           }
         }
@@ -531,9 +512,8 @@ class Game {
       }
       case 'helmet': p.shield = Math.max(p.shield, 10); break;
       case 'star': {
-        // шкала: 1 звезда — пули +30%; 2 звезды — две пули; 3 звезды — бронебой
         p.power = Math.min(4, (p.power || 1) + 1);
-        if (p.power >= 2) p.bulletSpeed = Math.round(150 * 1.3); // 195
+        if (p.power >= 2) p.bulletSpeed = Math.round(150 * 1.3);
         if (p.power >= 3) p.maxBullets = 2;
         if (p.power >= 4) p.bulletSpeed = 220;
         this.playerPower = p.power;
@@ -552,7 +532,6 @@ class Game {
         break;
       }
       case 'tank': this.lives++; break;
-      // «лодка» (как в оригинале): танк переплывает воду до конца уровня
       case 'raft': p.raft = true; break;
       case 'clock': this.freezeTimer = 8; for (const t of this.engine.tanks) if (!t.isPlayer) t.frozen = 8; break;
     }
@@ -583,7 +562,7 @@ class Game {
     // звёзды сбрасываются при смерти (как в оригинале): обычный танк, одна пуля
     this.playerPower = 1;
     // вибрация при гибели танка игрока (мобильные)
-    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(200);
+    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([150, 60, 150]);
     this.onSound('playerDeath');
     this.onEvent('explosion', p.x, p.y);
     if (this.lives <= 0){
@@ -608,7 +587,6 @@ class Game {
     this.enemiesOnField = w.tanks.filter(t => !t.isPlayer && t.alive).length;
     if (this.enemiesRemaining > 0 && this.enemiesOnField < this.budget.maxOn){
       if (this.respawnQueue.length === 0){
-        // очередь пуста, а на поле меньше трёх — но не чаще раза в SPAWN_INTERVAL
         if (this.time - this.lastSpawnAt >= SPAWN_INTERVAL){
           if (this.spawnEnemy()){ this.enemiesRemaining--; this.lastSpawnAt = this.time; }
         }
@@ -645,7 +623,6 @@ class Game {
       }
     }
     this.pickupBonuses();
-    // бонус живёт на поле BONUS_LIFE секунд
     this.engine.bonuses = this.engine.bonuses.filter(b => this.time - (b.t0 || 0) < BONUS_LIFE);
     if (!this.player.alive && this.state === 'playing') this.killPlayer();
     let flagAlive = false;
@@ -747,9 +724,8 @@ class SFX {
   }
   shoot(player){ this.playTone(player ? 560 : 420, 0.14, 'square', 0.28, 90); this.playNoise(0.10, 5000, 500, 0.30); this.playTone(player ? 170 : 130, 0.11, 'triangle', 0.20, 55); }
   ricochet(){ this.playTone(900, 0.05, 'triangle', 0.1, 500); }
-  hit(){ this.playTone(880, 0.09, 'square', 0.24, 440); this.playNoise(0.07, 3600, 700, 0.2); } // «пим» — попадание в броню
+  hit(){ this.playTone(880, 0.09, 'square', 0.24, 440); this.playNoise(0.07, 3600, 700, 0.2); }
   explosion(big){
-    // громкий слоёный взрыв: крах + низкий гул + подкат
     this.playNoise(big ? 0.9 : 0.5, big ? 1200 : 2200, 50, big ? 0.85 : 0.6);
     this.playTone(big ? 55 : 95, big ? 0.85 : 0.45, 'sawtooth', big ? 0.5 : 0.4, 22);
     this.playNoise(0.3, 400, 45, 0.45);
