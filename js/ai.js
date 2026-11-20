@@ -18,11 +18,12 @@ class EnemyAI {
     this.spread = 1 + rand() * 2;
     this.dist = this.approach ? computeFieldTo(this.world.tiles, this.approach) : computeField(this.world.tiles);
     this.goal = null;
-    this.attackT = 0;
+    this.fireTimer = 1.0; // регулярная стрельба: каждые fireRate сек (±20%) — как в оригинале
     this.replanCd = 2 + rand();
     this.stuck = 0; this.lastX = tank.x; this.lastY = tank.y;
     this.stuckWindow = 0; this.winX = undefined; this.winY = undefined;
     this.escapeT = 0; // таймер выхода из тупика
+    this.moveFailed = false; // не поехал в прошлом кадре — инерция отменяется
   }
   refreshField(){ this.dist = this.approach ? computeFieldTo(this.world.tiles, this.approach) : computeField(this.world.tiles); }
   cellFree(bx, by){
@@ -59,30 +60,8 @@ class EnemyAI {
       if (this.world.tiles[by*2+sy][bx*2+sx] === T.BRICK) return true;
     return false;
   }
-  lineClear(x1, y1, x2, y2){
-    // линия видимости: между центрами не должно быть кирпича/стали/воды
-    const dx = x2 - x1, dy = y2 - y1;
-    const steps = Math.max(1, Math.ceil((Math.abs(dx) + Math.abs(dy)) / CELL));
-    for (let i = 1; i < steps; i++){
-      const px = x1 + dx * (i / steps), py = y1 + dy * (i / steps);
-      const tx = Math.floor(px / CELL), ty = Math.floor(py / CELL);
-      if (ty < 0 || ty >= 26 || tx < 0 || tx >= 26) return false;
-      const v = this.world.tiles[ty][tx];
-      if (v === T.BRICK || v === T.STEEL || v === T.WATER) return false;
-    }
-    return true;
-  }
-  seesPlayer(){
-    const w = this.world;
-    if (w.playerX === undefined) return false;
-    const t = this.tank;
-    const cx = t.x + TANK/2, cy = t.y + TANK/2;
-    const horiz = Math.abs(w.playerY - cy) < TANK/2 + CELL*0.5 && Math.abs(w.playerX - cx) < 11*CELL;
-    const vert  = Math.abs(w.playerX - cx) < TANK/2 + CELL*0.5 && Math.abs(w.playerY - cy) < 11*CELL;
-    if (horiz && this.lineClear(cx, cy, w.playerX, cy)) return 'horiz';
-    if (vert && this.lineClear(cx, cy, cx, w.playerY)) return 'vert';
-    return false;
-  }
+  // (механика оригинала: у врагов нет «зрения» — они едут к штабу по своему алгоритму
+  //  и стреляют вперёд по своему курсу с рандомной регулярностью)
   step(dt){
     const t = this.tank, w = this.world;
     if (!t.alive || t.frozen > 0) return;
@@ -114,39 +93,48 @@ class EnemyAI {
       if (!shotAtGoal) this.pickGoal();
       this.stuck = 0;
     }
-    // во время выхода из тупика — только движение к цели, не огонь по игроку
-    const sight = this.escapeT > 0 ? false : this.seesPlayer();
     let targetDir = t.dir;
-    if (sight && this.attackT <= 0 && rand() < 0.65) this.attackT = this.p.attackOnSight * (0.5 + rand()*0.7);
-    if (this.attackT > 0){
-      this.attackT -= dt;
-      // направление атаки фиксируется на время атаки — дуло не крутится каждый кадр
-      if (sight){
-        this.attackDir = sight === 'horiz' ? (w.playerX > t.x ? DIR.RIGHT : DIR.LEFT)
-                       : (w.playerY > t.y ? DIR.DOWN : DIR.UP);
-      } else {
-        this.attackT = 0; this.attackDir = undefined; // потерял цель — выходим из атаки
-      }
-      if (this.attackDir !== undefined) targetDir = this.attackDir;
-    } else if (this.goal){
+    if (this.goal){
       const c = centerOfBig(this.goal.cx, this.goal.cy);
       const dx = c.x - t.x, dy = c.y - t.y;
-      if (Math.abs(dx) < 2 && Math.abs(dy) < 2) this.pickGoal();
-      // инерция: не поворачиваем, пока текущее направление ведёт к цели — иначе «стрелочки по кругу»
+      if (Math.abs(dx) < 2 && Math.abs(dy) < 2){
+        // дошёл до цели: если это штаб — стрелять по флагу вниз (как в оригинале — «штаб пал»)
+        const gd = this.dist[this.goal.cy] ? this.dist[this.goal.cy][this.goal.cx] : 0;
+        if (gd === 0){
+          t.dir = DIR.DOWN;
+          if (t.fireCd <= 0) w.fire(t);
+          this.fireTimer = Math.min(this.fireTimer, 0.6);
+          return;
+        }
+        this.pickGoal();
+      }
+      // инерция: держим направление, пока оно ведёт к цели И танк реально едет;
+      // если прошлый moveTank упёрся в стену/танк — инерция отменяется
       const cur = DIRV[t.dir];
-      const curGood = (cur[0] !== 0 && cur[0] === Math.sign(dx) && Math.abs(dx) > 2)
-                   || (cur[1] !== 0 && cur[1] === Math.sign(dy) && Math.abs(dy) > 2);
+      const curGood = !this.moveFailed && ((cur[0] !== 0 && cur[0] === Math.sign(dx) && Math.abs(dx) > 2)
+                   || (cur[1] !== 0 && cur[1] === Math.sign(dy) && Math.abs(dy) > 2));
       if (!curGood)
         targetDir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? DIR.RIGHT : DIR.LEFT) : (dy > 0 ? DIR.DOWN : DIR.UP);
+      this.moveFailed = false; // повторно проставится после w.moveTank ниже
     }
     w.moveTank(t, targetDir, dt);
+    if (!t.moving) this.moveFailed = true;
     let goalDist = Infinity;
     if (this.goal){
       const c = centerOfBig(this.goal.cx, this.goal.cy);
       goalDist = Math.abs(t.x - c.x) + Math.abs(t.y - c.y);
     }
-    const shootNow = (sight && this.attackT > 0 && rand() < 0.5) || (this.goal && this.isBrickCell(this.goal.cx, this.goal.cy) && goalDist < 64) || this.brickAhead();
-    if (t.fireCd <= 0 && shootNow && rand() < 0.85 * this.p.fireMul) w.fire(t);
+    // регулярная рандомная стрельба по курсу (как в оригинале)
+    this.fireTimer -= dt;
+    if (this.fireTimer <= 0){
+      this.fireTimer = (this.p.fireRate || 1.0) * (0.8 + rand() * 0.4);
+      if (rand() < 0.75) w.fire(t);
+    }
+    // стены на пути к штабу враги ломают, как в оригинале
+    if (this.goal && this.isBrickCell(this.goal.cx, this.goal.cy) && goalDist < 64 && t.fireCd <= 0 && rand() < 0.5)
+      w.fire(t);
+    else if (this.brickAhead() && t.fireCd <= 0 && rand() < 0.5)
+      w.fire(t);
   }
   tankAt(bx, by){
     const px = bx * 32, py = by * 32;
@@ -173,8 +161,7 @@ class EnemyAI {
     }
     if (best) this.goal = best;
     this.spread = 0;  // никакого блуждания, пока не поедет
-    this.attackDir = undefined;
-    this.attackT = 0; // не отвлекаться на игрока во время выхода
+    this.fireTimer = Math.max(this.fireTimer, 1.0); // после выхода не палить сразу
     this.escapeT = 1.4;
   }
   brickAhead(){

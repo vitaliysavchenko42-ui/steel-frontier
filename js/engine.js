@@ -36,7 +36,11 @@ class Engine {
     const nx = tank.x + dx * tank.speed * dt;
     const ny = tank.y + dy * tank.speed * dt;
     if (nx < 0 || ny < 0 || nx + TANK > W || ny + TANK > H) return false;
-    if (rectHitsTiles(nx, ny, TANK, TANK, this.tiles, SOLID_FOR_TANK)) return false;
+    // с бонусом «лодка» танк переплывает воду (как в оригинале)
+    const solid = (tank.raft && tank.raft > 0)
+      ? (v) => v === T.BRICK || v === T.STEEL
+      : SOLID_FOR_TANK;
+    if (rectHitsTiles(nx, ny, TANK, TANK, this.tiles, solid)) return false;
     for (const o of this.tanks){
       if (o === tank || !o.alive) continue;
       if (nx < o.x + TANK && nx + TANK > o.x && ny < o.y + TANK && ny + TANK > o.y) return false;
@@ -166,7 +170,7 @@ class Engine {
         }
         for (const t of this.tanks){
           if (!t.alive || t === b.owner) continue;
-          // вражеские пули тоже бьют врагов (как в классике) — заторы разрешаются стрельбой
+          if (!b.fromPlayer && !t.isPlayer) continue; // свои свои не бьют — как в оригинале
           if (b.x < t.x + TANK && b.x + b.w > t.x && b.y < t.y + TANK && b.y + b.h > t.y){
             if (t.shield > 0){ b.alive = false; break; }
             t.hp -= b.power;
