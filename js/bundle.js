@@ -21,7 +21,7 @@ const FLAG = [12, 22, 13, 23];
 function cellPx(cx, cy){ return [cx*BIG, cy*BIG]; }
 const ENEMY_TYPES = {
   basic:  { hp:1, speed:34,  bulletSpeed:110, fire:2.0,  score:100, color:'grey' },
-  fast:   { hp:1, speed:58,  bulletSpeed:130, fire:1.7,  score:200, color:'cyan' },
+  fast:   { hp:3, speed:58,  bulletSpeed:130, fire:1.7,  score:200, color:'cyan' }, // «БТР»: 3 удара, окраска меняется
   sniper: { hp:1, speed:40,  bulletSpeed:210, fire:2.2,  score:300, color:'gold' },
   armor:  { hp:3, speed:30,  bulletSpeed:120, fire:1.6,  score:400, color:'green' },
 };
