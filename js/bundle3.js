@@ -63,15 +63,35 @@ function drawTank(ctx, cx, cy, dir, style, t){
   ctx.fillStyle = palette.body;
   roundRect(ctx, -5.5, -5.5, 11, 11, 3.5); ctx.fill();
   if (et === 'fast'){
+    // окраска «БТР» по остатку брони: голубой (3) → охра (2) → серый (1)
+    const hpStage = (t && t.hp !== undefined) ? t.hp : 3;
+    if (hpStage <= 1){ palette.body = '#8d8d8d'; palette.body2 = '#6f6f6f'; palette.accent = '#4a4a4a'; }
+    else if (hpStage === 2){ palette.body = '#d4b13a'; palette.body2 = '#a3851f'; palette.accent = '#5a4810'; }
+    ctx.fillStyle = palette.body;
+    ctx.fillRect(-s/2 + 7, -s/2 + 3, s - 14, s - 6);
+    ctx.fillStyle = palette.body2;
+    roundRect(ctx, -7, -7, 14, 14, 4); ctx.fill();
+    ctx.fillStyle = palette.body;
+    roundRect(ctx, -5.5, -5.5, 11, 11, 3.5); ctx.fill();
+    // клин корпуса
     ctx.fillStyle = 'rgba(0,0,0,0.30)';
     ctx.beginPath();
     ctx.moveTo(-s/2 + 7, -s/2 + 3);
     ctx.lineTo(s/2 - 7, -s/2 + 3);
     ctx.lineTo(0, s/2 - 2);
     ctx.closePath(); ctx.fill();
+    // катки БТР: прямоугольные диски по бокам корпуса
+    ctx.fillStyle = '#1a1a1a';
+    for (const wx of [-s/2 + 1, -s/2 + 9, s/2 - 15, s/2 - 7]){
+      ctx.fillRect(wx, s/2 - 6, 7, 5);
+    }
+    // воздухозаборники сзади
     ctx.fillStyle = '#111';
     ctx.fillRect(-s/2 + 8, s/2 - 10, 5, 4);
     ctx.fillRect(s/2 - 13, s/2 - 10, 5, 4);
+    // антенна
+    ctx.strokeStyle = palette.accent; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(-4, -3); ctx.lineTo(-7, -s/2 + 4); ctx.stroke();
   } else if (et === 'armor'){
     ctx.fillStyle = '#101010';
     ctx.fillRect(-s/2 - 2, -s/2 + 1, 9, s - 2);
@@ -108,9 +128,16 @@ function drawTank(ctx, cx, cy, dir, style, t){
     ctx.beginPath(); ctx.arc(0, -2, 3.4, 0, 7); ctx.fill();
     ctx.fillStyle = '#7fdcff';
     ctx.beginPath(); ctx.arc(0, -2, 1.8, 0, 7); ctx.fill();
-  } else {
+  } else if (et === 'fast'){
+    // «БТР»: короткая башня-пушка поверх приплюснутого корпуса
     ctx.fillStyle = palette.barrel;
-    ctx.fillRect(-1.5, -TANK/2 - 3, 3, TANK/2 - 1);
+    ctx.fillRect(-1.5, -TANK/2 - 2, 3, TANK/2 - 2);
+    ctx.fillStyle = '#0e5a66';
+    ctx.fillRect(-4, -3, 8, 6);
+  } else {
+    // обычный враг: ствол заметно длиннее — как в оригинале
+    ctx.fillStyle = palette.barrel;
+    ctx.fillRect(-1.5, -TANK/2 - 6, 3, TANK/2 - 1);
   }
   if (isP && t){
     if (t.power >= 3){
@@ -185,20 +212,18 @@ function drawIceTile(ctx, x, y){
   ctx.stroke();
 }
 function drawFlag(ctx, x, y, time){
+  // штаб: флаг Российской Федерации — белый, синий, красный
   ctx.fillStyle = '#7d6a4a';
   ctx.fillRect(x + 4, y + 6, 4, 26);
-  ctx.fillStyle = '#d8b020';
-  ctx.beginPath();
-  ctx.moveTo(x + 8, y + 6);
-  ctx.lineTo(x + 26, y + 11 + Math.sin(time * 4) * 1.5);
-  ctx.lineTo(x + 8, y + 17);
-  ctx.closePath(); ctx.fill();
-  ctx.fillStyle = '#a82020';
-  ctx.beginPath();
-  ctx.moveTo(x + 8, y + 11);
-  ctx.lineTo(x + 22, y + 13.5);
-  ctx.lineTo(x + 8, y + 16);
-  ctx.closePath(); ctx.fill();
+  const fw = 19, fh = 21, fx0 = x + 8, fy0 = y + 6;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(fx0, fy0, fw, fh / 3);
+  ctx.fillStyle = '#0039a6';
+  ctx.fillRect(fx0, fy0 + fh / 3, fw, fh / 3);
+  ctx.fillStyle = '#d52b1e';
+  ctx.fillRect(fx0, fy0 + 2 * fh / 3, fw, fh / 3);
+  ctx.fillStyle = 'rgba(255,255,255,0.28)';
+  ctx.fillRect(fx0, fy0, fw, 2);
 }
 function drawBullet(ctx, b, player){
   const cx = OFF_X + b.x + b.w/2, cy = OFF_Y + b.y + b.h/2;
@@ -556,6 +581,33 @@ function drawMenu(ctx, menu, time){
       ctx.fillText(menu.items[i].label, CANVAS_W/2, y);
     }
   }
+  if (menu.recordsOpen){
+    const recs = C.UI_HELPERS ? C.UI_HELPERS.loadRecords() : [];
+    ctx.fillStyle = '#0c1018';
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 24px "Courier New", monospace';
+    ctx.fillStyle = '#e8c840';
+    ctx.fillText('РЕКОРДЫ', CANVAS_W/2, 70);
+    ctx.font = '15px "Courier New", monospace';
+    if (!recs.length){
+      ctx.fillStyle = '#8a94a8';
+      ctx.fillText('ПОКА ПУСТО — СЫГРАЙ ПАРТИЮ', CANVAS_W/2, 150);
+    } else {
+      const top = recs.slice(0, 10);
+      ctx.fillStyle = '#e8e8f0';
+      ctx.fillText('СЧЁТ      УРОВЕНЬ', CANVAS_W/2, 106);
+      top.forEach((rec, i) => {
+        ctx.fillStyle = i === 0 ? '#e8c840' : '#9aa4b8';
+        ctx.fillText(String(rec.score).padStart(6, ' ') + '   УР. ' + (rec.level || 1), CANVAS_W/2, 136 + i * 26);
+      });
+    }
+    ctx.font = '11px "Courier New", monospace';
+    ctx.fillStyle = '#4a5468';
+    ctx.fillText('ОГОНЬ / ПРОБЕЛ — НАЗАД', CANVAS_W/2, CANVAS_H - 30);
+    ctx.textAlign = 'left';
+    return;
+  }
   ctx.font = '11px "Courier New", monospace';
   ctx.fillStyle = '#4a5468';
   ctx.fillText('↑ ↓ — выбор · ПРОБЕЛ — подтвердить · P — пауза', CANVAS_W/2, CANVAS_H - 30);
@@ -634,7 +686,7 @@ function drawPause(ctx, time){
   ctx.fillText('P — продолжить · ESC — в меню', CANVAS_W/2, CANVAS_H/2 + 22);
   ctx.textAlign = 'left';
 }
-if (typeof window !== 'undefined') Object.assign(window.__TANKS__, { RENDER: { drawTank, drawField, drawBonus, drawBullet, drawExplosion, drawHUD, drawIntro, drawMenu, drawLevelSelect, drawStats, drawGameover, drawPause, drawIntroTank, CANVAS_W, CANVAS_H, OFF_X, OFF_Y, ENEMY_COLOR } });
+if (typeof window !== 'undefined') Object.assign(window.__TANKS__, { RENDER: { drawFlag, drawTank, drawField, drawBonus, drawBullet, drawExplosion, drawHUD, drawIntro, drawMenu, drawLevelSelect, drawStats, drawGameover, drawPause, drawIntroTank, CANVAS_W, CANVAS_H, OFF_X, OFF_Y, ENEMY_COLOR } });
 })();
 
 /* ===== ui.js ===== */
@@ -703,6 +755,11 @@ class UI {
       return;
     }
     if (this.mode === 'menu'){
+      if (this.menu.recordsOpen){
+        // просмотр рекордов: ОГОНЬ/пробел — назад
+        if (confirm) this.menu.recordsOpen = false;
+        return;
+      }
       if (down && (code === 'ArrowUp' || code === 'KeyW')) this.menu.index = (this.menu.index + this.menu.items.length - 1) % this.menu.items.length;
       else if (down && (code === 'ArrowDown' || code === 'KeyS')) this.menu.index = (this.menu.index + 1) % this.menu.items.length;
       else if (confirm){
@@ -789,7 +846,7 @@ if (typeof window !== 'undefined') Object.assign(window.__TANKS__, { UI, UI_HELP
   const touchState = {};
   document.querySelectorAll('.tbtn').forEach(btn => {
     const key = btn.dataset.key;
-    const on = (e) => { e.preventDefault(); touchState[key] = true; keys.add(key); ui.onKey('TouchStart', true); if (sfx.resume) sfx.resume(); };
+    const on = (e) => { e.preventDefault(); touchState[key] = true; keys.add(key); ui.onKey(key, true); ui.onKey('TouchStart', true); if (sfx.resume) sfx.resume(); };
     const off = (e) => { e.preventDefault(); touchState[key] = false; keys.delete(key); };
     btn.addEventListener('touchstart', on, { passive: false });
     btn.addEventListener('touchend', off, { passive: false });
