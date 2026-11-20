@@ -167,7 +167,7 @@ class Engine {
         }
         for (const t of this.tanks){
           if (!t.alive || t === b.owner) continue;
-          if (!b.fromPlayer && !t.isPlayer) continue;
+          // вражеские пули тоже бьют врагов (как в классике) — заторы разрешаются стрельбой
           if (b.x < t.x + TANK && b.x + b.w > t.x && b.y < t.y + TANK && b.y + b.h > t.y){
             if (t.shield > 0){ b.alive = false; break; }
             t.hp -= b.power;
@@ -214,6 +214,7 @@ class EnemyAI {
     this.stuck = 0; this.lastX = tank.x; this.lastY = tank.y;
     this.stuckWindow = 0; this.winX = undefined; this.winY = undefined;
     this.escapeT = 0; // таймер выхода из тупика
+    this.moveFailed = false; // не поехал в прошлом кадре — инерция отменяется
   }
   refreshField(){ this.dist = this.approach ? computeFieldTo(this.world.tiles, this.approach) : computeField(this.world.tiles); }
   cellFree(bx, by){
@@ -323,14 +324,17 @@ class EnemyAI {
       const c = centerOfBig(this.goal.cx, this.goal.cy);
       const dx = c.x - t.x, dy = c.y - t.y;
       if (Math.abs(dx) < 2 && Math.abs(dy) < 2) this.pickGoal();
-      // инерция: не поворачиваем, пока текущее направление ведёт к цели — иначе «стрелочки по кругу»
+      // инерция: держим направление, пока оно ведёт к цели И танк реально едет;
+      // если прошлый moveTank упёрся в стену/танк — инерция отменяется
       const cur = DIRV[t.dir];
-      const curGood = (cur[0] !== 0 && cur[0] === Math.sign(dx) && Math.abs(dx) > 2)
-                   || (cur[1] !== 0 && cur[1] === Math.sign(dy) && Math.abs(dy) > 2);
+      const curGood = !this.moveFailed && ((cur[0] !== 0 && cur[0] === Math.sign(dx) && Math.abs(dx) > 2)
+                   || (cur[1] !== 0 && cur[1] === Math.sign(dy) && Math.abs(dy) > 2));
       if (!curGood)
         targetDir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? DIR.RIGHT : DIR.LEFT) : (dy > 0 ? DIR.DOWN : DIR.UP);
+      this.moveFailed = false; // повторно проставится после w.moveTank ниже
     }
     w.moveTank(t, targetDir, dt);
+    if (!t.moving) this.moveFailed = true;
     let goalDist = Infinity;
     if (this.goal){
       const c = centerOfBig(this.goal.cx, this.goal.cy);
@@ -394,7 +398,7 @@ const { EnemyAI } = C;
 const { makeRng } = C;
 
 const BONUS_TYPES = ['grenade','helmet','star','shovel','tank','clock'];
-const SPAWN_INTERVAL = 5; // секунд между гибелью врага и появлением замены
+const SPAWN_INTERVAL = 3; // секунд между гибелью врага и появлением замены
 const BONUS_LIFE = 30;     // сколько секунд бонус живёт на поле
 // разные «подходы» к штабу — враги не едут колонной друг за другом
 const APPROACHES = [[6,11],[5,10],[7,10],[4,11],[8,11],[6,9]];
