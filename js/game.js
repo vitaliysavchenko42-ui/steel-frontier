@@ -27,17 +27,19 @@ class Game {
     this.onEvent = opts.onEvent || function(){};
     this.state = 'playing';
     this.lives = opts.lives || 3;
+    // звёзды переносятся на новый уровень через opts.playerPower — ДО создания танка
+    this.playerPower = opts.playerPower || 1;
     this.time = 0; this.levelTime = 0;
     this.enemiesRemaining = this.budget.total;
     this.spawnQueue = [];
     this.enemiesOnField = 0;
     this.enemyAis = new Map();
     this.spawnIdx = 0; // последовательный обход точек спавна
+    this.lastSpawnAt = -999; // время последнего спавна: из очереди — не чаще раза в SPAWN_INTERVAL
     this.respawnQueue = []; // моменты гибели врагов: замена через SPAWN_INTERVAL
     this.baseShovel = 0;
     this.freezeTimer = 0;
     this.stats = { kills:0, score:0, bonuses:0, time:0 };
-    this.playerPower = 1;
     this.explosions = [];
     this.sparkles = [];
     this.startLevel();
@@ -98,13 +100,15 @@ class Game {
     this.enemiesRemaining -= spawnedNow;
   }
   nextEnemyCell(){
-    // строго последовательный порядок: замена выходит только на следующую точку по кругу
-    const idx = this.spawnIdx % ENEMY_CELLS.length;
-    const [cx, cy] = ENEMY_CELLS[idx];
-    const [x, y] = cellPx(cx, cy);
-    const occupied = this.engine.tanks.some(t => t.alive && Math.abs(t.x - x) < 40 && Math.abs(t.y - y) < 40);
-    if (occupied) return null;
-    return { x, y, cx, cy, idx };
+    // последовательный порядок по кругу: занятая точка (в т.ч. игроком) пропускается
+    for (let i = 0; i < ENEMY_CELLS.length; i++){
+      const idx = (this.spawnIdx + i) % ENEMY_CELLS.length;
+      const [cx, cy] = ENEMY_CELLS[idx];
+      const [x, y] = cellPx(cx, cy);
+      const occupied = this.engine.tanks.some(t => t.alive && Math.abs(t.x - x) < 40 && Math.abs(t.y - y) < 40);
+      if (!occupied) return { x, y, cx, cy, idx };
+    }
+    return null; // все три точки заняты — ждём
   }
   spawnEnemy(){
     const spot = this.nextEnemyCell();
@@ -225,10 +229,11 @@ class Game {
       if (this.respawnQueue.length === 0){
         // очередь пуста, а на поле меньше трёх — спавним сразу
         if (this.spawnEnemy()) this.enemiesRemaining--;
-      } else if (this.time - this.respawnQueue[0] >= SPAWN_INTERVAL){
+      } else if (this.time - this.respawnQueue[0] >= SPAWN_INTERVAL && this.time - this.lastSpawnAt >= SPAWN_INTERVAL){
         if (this.spawnEnemy()){
           this.enemiesRemaining--;
           this.respawnQueue.shift();
+          this.lastSpawnAt = this.time;
         }
       }
     }
