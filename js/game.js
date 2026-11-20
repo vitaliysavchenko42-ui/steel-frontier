@@ -227,8 +227,10 @@ class Game {
     this.enemiesOnField = w.tanks.filter(t => !t.isPlayer && t.alive).length;
     if (this.enemiesRemaining > 0 && this.enemiesOnField < this.budget.maxOn){
       if (this.respawnQueue.length === 0){
-        // очередь пуста, а на поле меньше трёх — спавним сразу
-        if (this.spawnEnemy()) this.enemiesRemaining--;
+        // очередь пуста, а на поле меньше трёх — но не чаще раза в SPAWN_INTERVAL
+        if (this.time - this.lastSpawnAt >= SPAWN_INTERVAL){
+          if (this.spawnEnemy()){ this.enemiesRemaining--; this.lastSpawnAt = this.time; }
+        }
       } else if (this.time - this.respawnQueue[0] >= SPAWN_INTERVAL && this.time - this.lastSpawnAt >= SPAWN_INTERVAL){
         if (this.spawnEnemy()){
           this.enemiesRemaining--;
