@@ -199,21 +199,22 @@ ctx.fillStyle = palette.accent;
 ctx.fillRect(-2.5, 1, 5, 4);
 ctx.restore();
 }
-function drawBrickTile(ctx, x, y, t, hp){
+function drawBrickTile(ctx, x, y, gx, gy, hp){
+const drawSub = (sx, sy) => {
+const bx = x + sx * 8, by = y + sy * 8;
 ctx.fillStyle = '#8a4a2a';
-ctx.fillRect(x, y, CELL, CELL);
+ctx.fillRect(bx, by, 8, 8);
 ctx.fillStyle = '#6a3620';
-ctx.fillRect(x, y + CELL/2 - 1, CELL, 1.5);
-ctx.fillRect(x + (t % 2 ? CELL/2 : 0), y, 1, CELL/2);
-ctx.fillRect(x + (t % 2 ? 0 : CELL/2), y + CELL/2, 1, CELL/2);
+ctx.fillRect(bx, by + 3.2, 8, 1.2);
+ctx.fillRect(bx + ((gx + sx) % 2 ? 4 : 0), by, 1, 8);
 ctx.fillStyle = 'rgba(255,255,255,0.08)';
-ctx.fillRect(x, y, CELL, 1);
-if (hp !== undefined && hp < 4){
-ctx.fillStyle = 'rgba(20,10,6,0.55)';
-if (hp <= 2) ctx.fillRect(x + CELL/2 - 1.5, y + 2, 3, CELL - 4);
-if (hp <= 1) ctx.fillRect(x + 2, y + CELL/2 - 1.5, CELL - 4, 3);
-if (hp <= 2){ ctx.fillStyle = 'rgba(139,74,42,0.9)'; ctx.fillRect(x + CELL/2 - 3, y + CELL/2 - 1, 6, 2); }
-}
+ctx.fillRect(bx, by, 8, 1);
+};
+if (hp === undefined || hp === 15){ drawSub(0,0); drawSub(1,0); drawSub(0,1); drawSub(1,1); return; }
+ctx.fillStyle = '#101014';
+ctx.fillRect(x, y, CELL, CELL);
+for (let sy = 0; sy < 2; sy++) for (let sx = 0; sx < 2; sx++)
+if (hp & (1 << (sy * 2 + sx))) drawSub(sx, sy);
 }
 function drawSteelTile(ctx, x, y){
 ctx.fillStyle = '#9aa0a8';
@@ -488,7 +489,7 @@ ctx.fillRect(OFF_X, OFF_Y, W, H);
 for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++){
 const v = tiles[y][x];
 const px = OFF_X + x * CELL, py = OFF_Y + y * CELL;
-if (v === T.BRICK) drawBrickTile(ctx, px, py, x + y, game.engine.tileHp ? game.engine.tileHp[y * COLS + x] : 4);
+if (v === T.BRICK) drawBrickTile(ctx, px, py, x, y, game.engine.tileHp ? game.engine.tileHp[y * COLS + x] : undefined);
 else if (v === T.STEEL) drawSteelTile(ctx, px, py);
 else if (v === T.WATER) drawWaterTile(ctx, px, py, time);
 else if (v === T.ICE) drawIceTile(ctx, px, py);
