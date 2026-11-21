@@ -23,6 +23,38 @@ ctx[i ? 'lineTo' : 'moveTo'](cx + Math.cos(a) * r, cy + Math.sin(a) * r);
 }
 ctx.closePath();
 }
+function drawTankCore(ctx, cx, cy, dir, palette, t, isP){
+const s = TANK;
+ctx.fillStyle = palette.tracks;
+ctx.fillRect(-s/2, -s/2 + 2, 7, s - 4);
+ctx.fillRect(s/2 - 7, -s/2 + 2, 7, s - 4);
+ctx.fillStyle = '#555';
+for (let i = 0; i < 4; i++){
+ctx.fillRect(-s/2 + 1.5, -s/2 + 5 + i * 7, 4, 4);
+ctx.fillRect(s/2 - 5.5, -s/2 + 5 + i * 7, 4, 4);
+}
+ctx.fillStyle = palette.body;
+ctx.fillRect(-s/2 + 7, -s/2 + 3, s - 14, s - 6);
+ctx.fillStyle = 'rgba(255,255,255,0.16)';
+ctx.fillRect(-s/2 + 7, -s/2 + 3, s - 14, 3);
+ctx.fillStyle = palette.body2;
+ctx.beginPath();
+ctx.moveTo(-s/2 + 7, -s/2 + 3);
+ctx.lineTo(s/2 - 7, -s/2 + 3);
+ctx.lineTo(s/2 - 4, -s/2 + 10);
+ctx.lineTo(-s/2 + 4, -s/2 + 10);
+ctx.closePath();
+ctx.fill();
+ctx.fillStyle = palette.body2;
+roundRect(ctx, -7, -7, 14, 14, 4); ctx.fill();
+ctx.fillStyle = palette.body;
+roundRect(ctx, -5.5, -5.5, 11, 11, 3.5); ctx.fill();
+ctx.fillStyle = palette.barrel;
+ctx.fillRect(-1.5, -TANK/2 - 3, 3, TANK/2 - 1);
+ctx.fillStyle = palette.accent;
+ctx.fillRect(-2.5, 1, 5, 4);
+return;
+}
 function drawTank(ctx, cx, cy, dir, style, t){
 const s = TANK;
 const isP = style === 'player';
@@ -32,6 +64,8 @@ ctx.translate(cx, cy);
 ctx.rotate(dir * Math.PI / 2);
 ctx.fillStyle = 'rgba(0,0,0,0.22)';
 ctx.fillRect(-s/2 - 1, -s/2 + 5, s + 2, s - 3);
+const paletteRed = { body: '#c03a2e', body2: '#8f241b', tracks: '#1e1e1e', barrel: '#d88a7a', accent: '#5a1410' };
+if (style === 'red') return drawTankCore(ctx, cx, cy, dir, paletteRed, t, false);
 const palette = isP
 ? { body: '#4d7a3a', body2: '#3a5c2b', tracks: '#2b2b2b', barrel: '#8a8a8a', accent: '#c8b06a' }
 : et === 'fast' ? { body: '#49c2d4', body2: '#2a8fa0', tracks: '#1e1e1e', barrel: '#c8f2f8', accent: '#0e5a66' }
@@ -165,7 +199,7 @@ ctx.fillStyle = palette.accent;
 ctx.fillRect(-2.5, 1, 5, 4);
 ctx.restore();
 }
-function drawBrickTile(ctx, x, y, t){
+function drawBrickTile(ctx, x, y, t, hp){
 ctx.fillStyle = '#8a4a2a';
 ctx.fillRect(x, y, CELL, CELL);
 ctx.fillStyle = '#6a3620';
@@ -174,6 +208,12 @@ ctx.fillRect(x + (t % 2 ? CELL/2 : 0), y, 1, CELL/2);
 ctx.fillRect(x + (t % 2 ? 0 : CELL/2), y + CELL/2, 1, CELL/2);
 ctx.fillStyle = 'rgba(255,255,255,0.08)';
 ctx.fillRect(x, y, CELL, 1);
+if (hp !== undefined && hp < 4){
+ctx.fillStyle = 'rgba(20,10,6,0.55)';
+if (hp <= 2) ctx.fillRect(x + CELL/2 - 1.5, y + 2, 3, CELL - 4);
+if (hp <= 1) ctx.fillRect(x + 2, y + CELL/2 - 1.5, CELL - 4, 3);
+if (hp <= 2){ ctx.fillStyle = 'rgba(139,74,42,0.9)'; ctx.fillRect(x + CELL/2 - 3, y + CELL/2 - 1, 6, 2); }
+}
 }
 function drawSteelTile(ctx, x, y){
 ctx.fillStyle = '#9aa0a8';
@@ -215,72 +255,71 @@ ctx.moveTo(x + CELL - 3, y + 3); ctx.lineTo(x + 4, y + CELL - 4);
 ctx.stroke();
 }
 function drawEagle(ctx, x, y, time){
-ctx.fillStyle = '#7d6a4a';
-ctx.fillRect(x + 4, y + 6, 4, 26);
-ctx.fillStyle = '#8f241b';
+const cx = x + 16, cy = y + 15;
+const pulse = 0.5 + 0.5 * Math.sin(time * 3);
+ctx.fillStyle = 'rgba(24,16,16,0.55)';
+roundRect(ctx, x + 1, y + 2, 30, 28, 4); ctx.fill();
+ctx.fillStyle = 'rgba(255,110,90,' + (0.05 + 0.07 * pulse).toFixed(3) + ')';
+ctx.beginPath(); ctx.arc(cx, cy, 24, 0, 7); ctx.fill();
+ctx.fillStyle = '#d42a2a';
 ctx.beginPath();
-ctx.moveTo(x + 9, y + 7);
-ctx.lineTo(x + 27, y + 7);
-ctx.lineTo(x + 27, y + 19);
-ctx.quadraticCurveTo(x + 18, y + 30, x + 9, y + 19);
-ctx.closePath(); ctx.fill();
-ctx.strokeStyle = '#d8b020'; ctx.lineWidth = 1.3;
-ctx.beginPath();
-ctx.moveTo(x + 10.5, y + 8.5);
-ctx.lineTo(x + 25.5, y + 8.5);
-ctx.lineTo(x + 25.5, y + 18.5);
-ctx.quadraticCurveTo(x + 18, y + 27.5, x + 10.5, y + 18.5);
-ctx.closePath(); ctx.stroke();
-const cx = x + 18, cy = y + 14.5;
-ctx.fillStyle = '#e8c840';
-ctx.beginPath();
-if (ctx.ellipse) ctx.ellipse(cx, cy + 2.5, 3, 4.5, 0, 0, 7);
-else ctx.arc(cx, cy + 2.5, 3.5, 0, 7);
+if (ctx.ellipse) ctx.ellipse(cx, cy + 4.5, 4.6, 6.8, 0, 0, 7); else ctx.arc(cx, cy + 4.5, 5.5, 0, 7);
 ctx.fill();
+ctx.beginPath(); ctx.arc(cx - 4.6, cy - 6.5, 3.1, 0, 7); ctx.fill();
+ctx.beginPath(); ctx.arc(cx + 4.6, cy - 6.5, 3.1, 0, 7); ctx.fill();
+ctx.fillStyle = '#e8b020';
+ctx.fillRect(cx - 6.8, cy - 7, 1.7, 1.3);
+ctx.fillRect(cx + 5.1, cy - 7, 1.7, 1.3);
+ctx.fillStyle = '#a81d1d';
 ctx.beginPath();
-ctx.moveTo(cx - 1, cy - 1);
-ctx.lineTo(cx - 8.5, cy - 5.5);
-ctx.lineTo(cx - 6, cy + 1);
-ctx.lineTo(cx - 8.5, cy + 0.5);
-ctx.lineTo(cx - 3, cy + 4);
+ctx.moveTo(cx - 2, cy - 1.5);
+ctx.lineTo(cx - 14.5, cy - 9.5);
+ctx.lineTo(cx - 10, cy + 1.5);
+ctx.lineTo(cx - 3.5, cy + 0.5);
 ctx.closePath(); ctx.fill();
 ctx.beginPath();
-ctx.moveTo(cx + 1, cy - 1);
-ctx.lineTo(cx + 8.5, cy - 5.5);
-ctx.lineTo(cx + 6, cy + 1);
-ctx.lineTo(cx + 8.5, cy + 0.5);
-ctx.lineTo(cx + 3, cy + 4);
+ctx.moveTo(cx + 2, cy - 1.5);
+ctx.lineTo(cx + 14.5, cy - 9.5);
+ctx.lineTo(cx + 10, cy + 1.5);
+ctx.lineTo(cx + 3.5, cy + 0.5);
 ctx.closePath(); ctx.fill();
-ctx.beginPath(); ctx.arc(cx - 2.5, cy - 4, 1.7, 0, 7); ctx.fill();
-ctx.beginPath(); ctx.arc(cx + 2.5, cy - 4, 1.7, 0, 7); ctx.fill();
-ctx.fillStyle = '#5a4010';
-ctx.fillRect(cx - 4.8, cy - 4.3, 2.2, 0.9);
-ctx.fillRect(cx + 2.6, cy - 4.3, 2.2, 0.9);
-ctx.fillStyle = '#d8b020';
-ctx.fillRect(cx - 3, cy - 7, 6, 1.6);
-ctx.fillRect(cx - 2, cy - 8.2, 1, 1.4);
-ctx.fillRect(cx + 0.8, cy - 8.2, 1, 1.4);
+ctx.fillStyle = '#8f1818';
+ctx.beginPath();
+ctx.moveTo(cx - 3, cy + 9);
+ctx.lineTo(cx + 3, cy + 9);
+ctx.lineTo(cx, cy + 14.5);
+ctx.closePath(); ctx.fill();
+ctx.fillStyle = '#e8c840';
+ctx.fillRect(cx - 4.2, cy - 12, 8.4, 1.7);
+ctx.fillRect(cx - 3.2, cy - 13.8, 1.3, 2);
+ctx.fillRect(cx - 0.65, cy - 14.5, 1.3, 2.6);
+ctx.fillRect(cx + 1.9, cy - 13.8, 1.3, 2);
+ctx.fillStyle = '#fff';
+ctx.beginPath(); ctx.arc(cx - 4, cy - 7, 0.9, 0, 7); ctx.fill();
+ctx.beginPath(); ctx.arc(cx + 4, cy - 7, 0.9, 0, 7); ctx.fill();
 }
 function drawEagleFallen(ctx, cx, cy){
 ctx.save();
 ctx.translate(cx, cy);
-ctx.rotate(0.8);
+ctx.rotate(0.75);
 ctx.globalAlpha = 0.9;
-ctx.fillStyle = '#4a4038';
-ctx.beginPath(); ctx.arc(0, 6, 8, 0, 7); ctx.fill();
+ctx.fillStyle = '#7a2a24';
+ctx.beginPath(); ctx.arc(0, 4, 7.5, 0, 7); ctx.fill();
 ctx.beginPath();
-ctx.moveTo(-13, 0); ctx.lineTo(-2, -7); ctx.lineTo(-6, 5);
+ctx.moveTo(-11.5, -1); ctx.lineTo(-2, -6.5); ctx.lineTo(-5, 4.5);
 ctx.closePath(); ctx.fill();
 ctx.beginPath();
-ctx.moveTo(13, 0); ctx.lineTo(2, -7); ctx.lineTo(6, 5);
+ctx.moveTo(11.5, -1); ctx.lineTo(2, -6.5); ctx.lineTo(5, 4.5);
 ctx.closePath(); ctx.fill();
-ctx.fillStyle = '#2f2a26';
-ctx.fillRect(-5, -13, 10, 2.4);
+ctx.fillStyle = '#5a1815';
+ctx.beginPath(); ctx.arc(-4, -6, 2.6, 0, 7); ctx.fill();
+ctx.beginPath(); ctx.arc(4, -6, 2.6, 0, 7); ctx.fill();
+ctx.fillStyle = '#e8b020';
+ctx.fillRect(cx ? -5.5 : -5.5, -7.6, 1.6, 1.2);
+ctx.fillRect(3.9, -7.6, 1.6, 1.2);
+ctx.fillStyle = '#e8c840';
+ctx.fillRect(-4.2, -11.5, 8.4, 1.7);
 ctx.restore();
-ctx.fillStyle = 'rgba(170,20,20,0.8)';
-ctx.beginPath(); ctx.arc(cx - 8, cy + 14, 3.2, 0, 7); ctx.fill();
-ctx.beginPath(); ctx.arc(cx + 7, cy + 16, 2.4, 0, 7); ctx.fill();
-ctx.beginPath(); ctx.arc(cx, cy + 11, 1.8, 0, 7); ctx.fill();
 }
 function drawBullet(ctx, b, player){
 const cx = OFF_X + b.x + b.w/2, cy = OFF_Y + b.y + b.h/2;
@@ -449,7 +488,7 @@ ctx.fillRect(OFF_X, OFF_Y, W, H);
 for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++){
 const v = tiles[y][x];
 const px = OFF_X + x * CELL, py = OFF_Y + y * CELL;
-if (v === T.BRICK) drawBrickTile(ctx, px, py, x + y);
+if (v === T.BRICK) drawBrickTile(ctx, px, py, x + y, game.engine.tileHp ? game.engine.tileHp[y * COLS + x] : 4);
 else if (v === T.STEEL) drawSteelTile(ctx, px, py);
 else if (v === T.WATER) drawWaterTile(ctx, px, py, time);
 else if (v === T.ICE) drawIceTile(ctx, px, py);
@@ -459,41 +498,23 @@ for (const b of game.engine.bonuses) drawBonus(ctx, b, time);
 const fx = OFF_X + FLAGT[0] * CELL, fy = OFF_Y + FLAGT[1] * CELL;
 if (tiles[FLAGT[1]][FLAGT[0]] === T.FLAG){
 const glow = 0.5 + 0.5 * Math.sin(time * 3);
-ctx.fillStyle = 'rgba(255,214,120,' + (0.05 + 0.07 * glow).toFixed(3) + ')';
-ctx.beginPath(); ctx.arc(fx + 16, fy + 16, 30, 0, 7); ctx.fill();
+ctx.fillStyle = 'rgba(255,110,90,' + (0.05 + 0.07 * glow).toFixed(3) + ')';
+ctx.beginPath(); ctx.arc(fx + 16, fy + 16, 26, 0, 7); ctx.fill();
 drawEagle(ctx, fx, fy, time);
 } else {
-ctx.save();
-ctx.translate(fx + 18, fy + 16);
-ctx.rotate(0.55);
-ctx.globalAlpha = 0.92;
-ctx.fillStyle = '#4a4038';
-ctx.beginPath(); ctx.arc(0, 2, 5, 0, 7); ctx.fill();
-ctx.beginPath();
-ctx.moveTo(-7, -1); ctx.lineTo(-1, -4); ctx.lineTo(-4, 2);
-ctx.closePath(); ctx.fill();
-ctx.beginPath();
-ctx.moveTo(7, -1); ctx.lineTo(1, -4); ctx.lineTo(4, 2);
-ctx.closePath(); ctx.fill();
-ctx.fillStyle = '#2f2a26';
-ctx.fillRect(-3, -7, 6, 1.4);
-ctx.restore();
+drawEagleFallen(ctx, fx + 18, fy + 16);
 const blood = 0.5 + 0.5 * Math.sin(time * 2);
-ctx.fillStyle = 'rgba(160,20,20,' + (0.55 + 0.25 * blood).toFixed(3) + ')';
-ctx.beginPath(); ctx.arc(fx + 14, fy + 24, 2.4, 0, 7); ctx.fill();
-ctx.beginPath(); ctx.arc(fx + 21, fy + 27, 1.8, 0, 7); ctx.fill();
-ctx.beginPath(); ctx.arc(fx + 18, fy + 20, 1.4, 0, 7); ctx.fill();
+ctx.fillStyle = 'rgba(150,20,20,' + (0.45 + 0.25 * blood).toFixed(3) + ')';
+ctx.beginPath();
+if (ctx.ellipse) ctx.ellipse(fx + 16, fy + 20, 11 + blood * 2, 7 + blood, 0, 0, 7); else ctx.arc(fx + 16, fy + 20, 9, 0, 7);
+ctx.fill();
+ctx.fillStyle = 'rgba(170,30,30,' + (0.4 + 0.3 * blood).toFixed(3) + ')';
+for (let i = 0; i < 5; i++){ ctx.beginPath(); ctx.arc(fx + 8 + i * 4, fy + 24 + (i % 2 ? 4 : 0), 1.6 + (i % 2) * 0.8, 0, 7); ctx.fill(); }
 }
 for (const t of game.engine.tanks){
 if (!t.alive) continue;
 drawTank(ctx, OFF_X + t.x + TANK/2, OFF_Y + t.y + TANK/2, t.dir,
-t.isPlayer ? 'player' : (t.elite && Math.sin(time * 12) > 0 ? 'gold' : (ENEMY_COLOR[t.type] || 'grey')), t);
-if (t.elite && !t.isPlayer){
-const ea = 0.5 + 0.5 * Math.sin(time * 10);
-ctx.strokeStyle = 'rgba(255,90,60,' + (0.3 + 0.5 * ea).toFixed(3) + ')';
-ctx.lineWidth = 2.5;
-ctx.beginPath(); ctx.arc(OFF_X + t.x + 16, OFF_Y + t.y + 16, 23 + Math.sin(time * 10) * 2, 0, 7); ctx.stroke();
-}
+t.isPlayer ? 'player' : (t.elite ? (Math.sin(time * 14) > 0 ? 'red' : (t.type === 'armor' && Math.sin(time * 12) > 0 ? 'gold' : ENEMY_COLOR[t.type] || 'grey')) : (ENEMY_COLOR[t.type] || 'grey')), t);
 if (t.spawnFlash > 0){
 const a = 0.35 + 0.4 * (0.5 + 0.5 * Math.sin(time * 16));
 drawSpawnStar(ctx, OFF_X + t.x + TANK/2, OFF_Y + t.y + TANK/2, 11 + 3 * Math.sin(time * 12), a);
@@ -506,7 +527,31 @@ ctx.beginPath(); ctx.arc(OFF_X + t.x + 16, OFF_Y + t.y + 16, 22, 0, 7); ctx.stro
 }
 }
 for (const b of game.engine.bullets) drawBullet(ctx, b, b.fromPlayer);
+for (const sp of game.splashes || []){
+const sp2 = (time - sp.t0) / 0.9;
+if (sp2 < 0 || sp2 > 1) continue;
+for (let i = 0; i < 14; i++){
+const ang = i * 2 * Math.PI / 14 + i * 0.7;
+const dist = 6 + sp2 * (14 + (i % 5) * 6);
+const sx2 = sp.x + Math.cos(ang) * dist;
+const sy2 = sp.y + Math.sin(ang) * dist - sp2 * sp2 * 6;
+ctx.fillStyle = 'rgba(175,25,25,' + (1 - sp2).toFixed(2) + ')';
+ctx.beginPath(); ctx.arc(sx2, sy2, 2.6 - sp2 * 1.6, 0, 7); ctx.fill();
+}
+ctx.strokeStyle = 'rgba(195,38,38,' + (0.7 * (1 - sp2)).toFixed(2) + ')';
+ctx.lineWidth = 2;
+ctx.beginPath(); ctx.arc(sp.x, sp.y, 4 + sp2 * 26, 0, 7); ctx.stroke();
+}
 for (const ex of game.explosions || []) drawExplosion(ctx, ex, time);
+for (const d of game.debris || []){
+const dp = (time - d.t0) / d.dur;
+if (dp < 0 || dp > 1) continue;
+const da = 1 - dp;
+const px = d.x + d.dx * dp * 34, py = d.y + d.dy * dp * 34;
+ctx.fillStyle = d.red ? 'rgba(170,30,30,' + da.toFixed(2) + ')' : 'rgba(125,125,135,' + da.toFixed(2) + ')';
+ctx.fillRect(px - 1.5, py - 1.5, 3, 3);
+if (dp < 0.35){ ctx.fillStyle = 'rgba(255,180,90,' + (0.5 * (1 - dp / 0.35)).toFixed(2) + ')'; ctx.fillRect(px - 0.5, py - 0.5, 1.5, 1.5); }
+}
 for (const sp of game.sparkles || []) drawSparkle(ctx, sp, time);
 for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++)
 if (tiles[y][x] === T.FOREST) drawForestTile(ctx, OFF_X + x * CELL, OFF_Y + y * CELL);
@@ -790,189 +835,4 @@ ctx.fillText('P — продолжить · ESC — в меню', CANVAS_W/2, CA
 ctx.textAlign = 'left';
 }
 if (typeof window !== 'undefined') Object.assign(window.__TANKS__, { RENDER: { drawEagle, drawEagleFallen, drawTank, drawField, drawBonus, drawBullet, drawExplosion, drawHUD, drawIntro, drawMenu, drawLevelSelect, drawStats, drawGameover, drawPause, drawIntroTank, CANVAS_W, CANVAS_H, OFF_X, OFF_Y, ENEMY_COLOR } });
-})();
-(function(){
-const C = window.__TANKS__;
-const R = C.RENDER;
-const CANVAS_W = R.CANVAS_W, CANVAS_H = R.CANVAS_H;
-const LS_KEY = 'steel-frontier-records';
-function loadRecords(){
-try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]'); } catch(e){ return []; }
-}
-function saveRecord(rec){
-const recs = loadRecords();
-recs.push(rec);
-recs.sort((a, b) => b.score - a.score);
-localStorage.setItem(LS_KEY, JSON.stringify(recs.slice(0, 10)));
-}
-function maxUnlocked(){
-const r = loadRecords();
-return Math.max(1, ...r.map(x => (x.level || 1) + 1));
-}
-class UI {
-constructor(canvas, sfx){
-this.canvas = canvas;
-this.ctx = canvas.getContext('2d');
-this.sfx = sfx;
-this.mode = 'intro';
-this.time = 0;
-this.menu = { items: [
-{ label: 'ИГРАТЬ', action: 'play' },
-{ label: 'ВЫБОР УРОВНЯ', action: 'select' },
-{ label: 'ЗВУК: ВКЛ', action: 'sound' },
-{ label: 'РЕКОРДЫ', action: 'records' },
-], index: 0, level: 1, maxUnlocked: maxUnlocked(), recordsOpen: false };
-this.game = null;
-this.pendingStats = null;
-}
-startGame(level, power){
-const G = C.Game;
-this.game = new G(level, {
-onSound: (name) => { if (this.sfx[name]) this.sfx[name](); },
-onEvent: () => {},
-playerPower: power,
-});
-this.mode = 'playing';
-if (this.sfx.ensure) this.sfx.ensure();
-if (this.sfx.resume) this.sfx.resume();
-if (this.sfx.playTheme) this.sfx.playTheme();
-}
-nextLevel(){
-const old = this.game;
-const score = old.engine.stats.score;
-const lives = old.lives;
-const power = old.playerPower;
-const level = old.level + 1;
-this.startGame(level, power);
-this.game.engine.stats.score = score;
-this.game.lives = lives;
-}
-onKey(code, down){
-const sfx = this.sfx;
-const confirm = down && (code === 'Space' || code === 'Enter' || code === 'TouchStart');
-if (this.mode === 'intro'){
-if (confirm){ if (sfx.ensure) sfx.ensure(); if (sfx.resume) sfx.resume(); this.mode = 'menu'; if (sfx.playTheme) sfx.playTheme(); }
-return;
-}
-if (this.mode === 'menu'){
-if (this.menu.recordsOpen){
-if (confirm) this.menu.recordsOpen = false;
-return;
-}
-if (down && (code === 'ArrowUp' || code === 'KeyW')) this.menu.index = (this.menu.index + this.menu.items.length - 1) % this.menu.items.length;
-else if (down && (code === 'ArrowDown' || code === 'KeyS')) this.menu.index = (this.menu.index + 1) % this.menu.items.length;
-else if (confirm){
-const a = this.menu.items[this.menu.index].action;
-if (a === 'play') this.startGame(this.menu.level || 1);
-else if (a === 'select') this.mode = 'levelSelect';
-else if (a === 'sound'){ this.sfx.setEnabled(!this.sfx.enabled); this.menu.items[2].label = 'ЗВУК: ' + (this.sfx.enabled ? 'ВКЛ' : 'ВЫКЛ'); }
-else if (a === 'records') this.menu.recordsOpen = !this.menu.recordsOpen;
-}
-return;
-}
-if (this.mode === 'levelSelect'){
-if (down && code === 'ArrowLeft') this.menu.level = Math.max(1, this.menu.level - 1);
-else if (down && code === 'ArrowRight') this.menu.level = Math.min(999, this.menu.level + 1);
-else if (confirm && this.menu.level <= this.menu.maxUnlocked) this.startGame(this.menu.level);
-else if (down && code === 'Escape') this.mode = 'menu';
-return;
-}
-if (this.mode === 'playing'){
-if (down && code === 'KeyP') this.mode = 'paused';
-else if (down && code === 'Escape') this.mode = 'paused';
-return;
-}
-if (this.mode === 'paused' && down && (code === 'KeyP' || code === 'Escape')){
-this.mode = (code === 'Escape') ? 'menu' : 'playing';
-return;
-}
-if (this.mode === 'stats' && confirm) this.nextLevel();
-else if (this.mode === 'gameover' && confirm) this.mode = 'menu';
-}
-update(dt, keys){
-this.time += dt;
-}
-render(){
-const ctx = this.ctx;
-if (this.mode === 'intro') R.drawIntro(ctx, this.time, loadRecords());
-else if (this.mode === 'menu') R.drawMenu(ctx, this.menu, this.time);
-else if (this.mode === 'levelSelect') R.drawLevelSelect(ctx, this.menu, this.time);
-else if (this.mode === 'playing' || this.mode === 'paused'){
-const g = this.game;
-R.drawField(ctx, g, g.time);
-R.drawHUD(ctx, g, g.time);
-if (this.mode === 'paused') R.drawPause(ctx, this.time);
-if (g.state === 'won' && !g.statsShown){
-g.statsShown = true;
-this.pendingStats = g;
-setTimeout(() => { if (this.mode === 'playing') this.mode = 'stats'; }, 900);
-}
-if (g.state === 'gameover' && !g.overShown){
-g.overShown = true;
-saveRecord({ score: g.engine.stats.score, level: g.level, date: new Date().toISOString().slice(0,10) });
-this.menu.maxUnlocked = maxUnlocked();
-setTimeout(() => { if (this.mode === 'playing') this.mode = 'gameover'; }, 1200);
-}
-}
-else if (this.mode === 'stats' && this.pendingStats) R.drawStats(ctx, this.pendingStats, this.time);
-else if (this.mode === 'gameover' && this.game) R.drawGameover(ctx, this.game);
-}
-}
-if (typeof window !== 'undefined') Object.assign(window.__TANKS__, { UI, UI_HELPERS: { loadRecords, saveRecord, maxUnlocked } });
-})();
-(function(){
-(function boot(){
-const C = window.__TANKS__;
-const canvas = document.getElementById('game');
-const sfx = new C.SFX();
-const ui = new C.UI(canvas, sfx);
-window.__SF = { ui, sfx };
-let last = performance.now();
-const keys = new Set();
-let lastDir = null;
-const HOLD_KEYS = ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','KeyW','KeyA','KeyS','KeyD','Space'];
-window.addEventListener('keydown', (e) => {
-if (HOLD_KEYS.includes(e.code)) e.preventDefault();
-if (e.repeat) return;
-keys.add(e.code);
-ui.onKey(e.code, true);
-if (sfx.resume) sfx.resume();
-});
-window.addEventListener('keyup', (e) => keys.delete(e.code));
-const touchState = {};
-document.querySelectorAll('.tbtn').forEach(btn => {
-const key = btn.dataset.key;
-const on = (e) => { e.preventDefault(); touchState[key] = true; keys.add(key); ui.onKey(key, true); if (key === 'Space') ui.onKey('TouchStart', true); if (sfx.resume) sfx.resume(); };
-const off = (e) => { e.preventDefault(); touchState[key] = false; keys.delete(key); };
-btn.addEventListener('touchstart', on, { passive: false });
-btn.addEventListener('touchend', off, { passive: false });
-btn.addEventListener('touchcancel', off, { passive: false });
-btn.addEventListener('mousedown', on);
-btn.addEventListener('mouseup', off);
-btn.addEventListener('mouseleave', off);
-});
-function loop(now){
-const dt = Math.min(0.05, (now - last) / 1000);
-last = now;
-ui.update(dt, keys);
-if (ui.mode === 'playing' && ui.game){
-const input = {};
-const DIR_KEY = { ArrowUp: 0, KeyW: 0, ArrowRight: 1, KeyD: 1, ArrowDown: 2, KeyS: 2, ArrowLeft: 3, KeyA: 3 };
-let dir = null;
-if (lastDir !== null){
-for (const k of keys){ if (DIR_KEY[k] === lastDir){ dir = lastDir; break; } }
-}
-if (dir === null){
-for (const k of keys){ if (DIR_KEY[k] !== undefined){ dir = DIR_KEY[k]; break; } }
-}
-if (dir !== null){ input.dir = dir; lastDir = dir; } else lastDir = null;
-input.fire = keys.has('Space');
-ui.game.step(dt, input);
-if (sfx.setEngine) sfx.setEngine(!!input.dir && ui.game.player.alive);
-}
-ui.render();
-requestAnimationFrame(loop);
-}
-requestAnimationFrame(loop);
-})();
 })();
