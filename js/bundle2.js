@@ -16,7 +16,7 @@ constructor(tiles){
 this.tiles = tiles.map(r => r.slice());
 this.tileHp = {};
 for (let y = 0; y < this.tiles.length; y++) for (let x = 0; x < this.tiles[y].length; x++)
-if (this.tiles[y][x] === T.BRICK) this.tileHp[y * COLS + x] = 4;
+if (this.tiles[y][x] === T.BRICK) this.tileHp[y * COLS + x] = 15;
 this.tanks = []; this.bullets = []; this.effects = [];
 this.time = 0; this.bonuses = []; this.stats = { kills: 0, score: 0, byType: {} };
 this.onShot = null; this.onHit = null; this.onClash = null; this.onDeath = null;
@@ -95,15 +95,18 @@ damageTile(tx, ty, power, b){
 const v = this.tiles[ty] && this.tiles[ty][tx];
 if (v === T.BRICK) {
 const key = ty * COLS + tx;
-this.tileHp[key] = (this.tileHp[key] === undefined ? 4 : this.tileHp[key]) - 1;
-if (this.tileHp[key] <= 0) this.tiles[ty][tx] = T.EMPTY;
-const [ddx, ddy] = b ? (b.dir % 2 === 0 ? [1, 0] : [0, 1]) : [0, 0];
-const nx2 = tx + ddx, ny2 = ty + ddy;
-if (nx2 >= 0 && ny2 >= 0 && nx2 < COLS && ny2 < ROWS && this.tiles[ny2][nx2] === T.BRICK){
-const k2 = ny2 * COLS + nx2;
-this.tileHp[k2] = (this.tileHp[k2] === undefined ? 4 : this.tileHp[k2]) - 1;
-if (this.tileHp[k2] <= 0) this.tiles[ny2][nx2] = T.EMPTY;
-}
+let hp = (this.tileHp[key] === undefined) ? 15 : this.tileHp[key];
+const dir = (b && b.dir !== undefined) ? b.dir : 0;
+let front, back;
+if (dir === 0) { front = [2,3]; back = [0,1]; }
+else if (dir === 2) { front = [0,1]; back = [2,3]; }
+else if (dir === 1) { front = [0,2]; back = [1,3]; }
+else { front = [1,3]; back = [0,2]; }
+const alive = (s) => (hp & (1 << s)) !== 0;
+if (front.every(alive)) { for (const s of front) hp &= ~(1 << s); }
+else { for (const s of back) hp &= ~(1 << s); }
+this.tileHp[key] = hp;
+if (hp === 0) this.tiles[ty][tx] = T.EMPTY;
 return true;
 }
 if (v === T.BASEWALL) {
@@ -229,8 +232,13 @@ const cx = bigCell(t.x), cy = bigCell(t.y);
 const neighbors = [[1,0],[-1,0],[0,1],[0,-1]]
 .map(([dx,dy]) => ({ cx: cx+dx, cy: cy+dy }))
 .filter(c => c.cx>=0 && c.cy>=0 && c.cx<13 && c.cy<13);
-const free = neighbors.filter(c => this.cellFree(c.cx, c.cy));
-const pool = free.length ? free : neighbors;
+let free = neighbors.filter(c => this.cellFree(c.cx, c.cy) && !this.tankAt(c.cx, c.cy));
+let pool = free.length ? free : neighbors.filter(c => this.cellFree(c.cx, c.cy));
+if (!pool.length) pool = neighbors;
+if (this.prevGoal && pool.length > 1){
+const filtered = pool.filter(c => !(c.cx === this.prevGoal.cx && c.cy === this.prevGoal.cy));
+if (filtered.length) pool = filtered;
+}
 let best = null, bestD = Infinity;
 for (const c of pool){
 const d = this.dist[c.cy][c.cx];
@@ -242,6 +250,7 @@ best = pool.length ? pool[Math.floor(rand() * pool.length)] : { cx, cy };
 const near = pool.filter(c => this.dist[c.cy][c.cx] <= bestD + this.spread);
 if (near.length > 1 && this.spread > 0 && rand() < 0.45) best = near[Math.floor(rand() * near.length)];
 }
+this.prevGoal = this.goal;
 this.goal = best;
 }
 isBrickCell(bx, by){
@@ -266,6 +275,41 @@ this.stuckWindow = 0; this.winX = t.x; this.winY = t.y;
 if (moved < 16) this.hardUnstick(t);
 }
 if (this.escapeT > 0) this.escapeT -= dt;
+const hh = this.__hist || (this.__hist = []);
+hh.push({ x: t.x, y: t.y, tt: w.time });
+while (hh.length && hh[0].tt < w.time - 2) hh.shift();
+for (const h of hh){
+if (w.time - h.tt > 1.6 && Math.abs(t.x - h.x) < 4 && Math.abs(t.y - h.y) < 4){ this.stuck = 3; hh.length = 0; break; }
+}
+if (this.stuck > 2.2){
+this.stuck = 0;
+const snap = (d) => {
+if (d === 0 || d === 2) t.x = Math.min(C.W - C.TANK, Math.max(0, Math.round(t.x / 16) * 16));
+else t.y = Math.min(C.H - C.TANK, Math.max(0, Math.round(t.y / 16) * 16));
+};
+const dirsOK = [0,1,2,3].filter(d => {
+const ox = t.x, oy = t.y, od = t.dir;
+snap(d); t.dir = d;
+const mv2 = w.canMove(t, d, 0.05);
+t.x = ox; t.y = oy; t.dir = od;
+return !!mv2;
+});
+if (dirsOK.length) snap(dirsOK[Math.floor(Math.random() * dirsOK.length)]);
+const bxj = bigCell(t.x), byj = bigCell(t.y);
+const poolJ = [[1,0],[-1,0],[0,1],[0,-1]]
+.map(([dxj, dyj]) => ({ cx: bxj + dxj, cy: byj + dyj }))
+.filter(c => c.cx >= 0 && c.cy >= 0 && c.cx < 13 && c.cy < 13);
+if (poolJ.length){
+const cj = poolJ[Math.floor(Math.random() * poolJ.length)];
+const cjj = { x: cj.cx * 32, y: cj.cy * 32 };
+const dxj2 = cjj.x - t.x, dyj2 = cjj.y - t.y;
+if (Math.abs(dxj2) > Math.abs(dyj2)) t.dir = dxj2 > 0 ? DIR.RIGHT : DIR.LEFT;
+else t.dir = dyj2 > 0 ? DIR.DOWN : DIR.UP;
+}
+this.prevGoal = this.goal;
+this.pickGoal();
+if (t.fireCd <= 0) w.fire(t);
+}
 if (this.stuck > 1.2){
 let shotAtGoal = false;
 if (this.goal && this.isBrickCell(this.goal.cx, this.goal.cy)){
@@ -286,12 +330,39 @@ const dx = c.x - t.x, dy = c.y - t.y;
 if (Math.abs(dx) < 2 && Math.abs(dy) < 2){
 const gd = this.dist[this.goal.cy] ? this.dist[this.goal.cy][this.goal.cx] : 0;
 if (gd === 0){
-t.dir = DIR.DOWN;
+const fx2 = 6 * 32 + 16, fy2 = 11 * 32 + 16;
+const ddx3 = fx2 - (t.x + 16), ddy3 = fy2 - (t.y + 16);
+if (Math.abs(ddx3) > Math.abs(ddy3)) t.dir = ddx3 > 0 ? DIR.RIGHT : DIR.LEFT;
+else t.dir = ddy3 > 0 ? DIR.DOWN : DIR.UP;
 if (t.fireCd <= 0) w.fire(t);
 this.fireTimer = Math.min(this.fireTimer, 0.6);
 return;
 }
+let better = null, bestD2 = gd;
+const cx2 = bigCell(t.x), cy2 = bigCell(t.y);
+for (const [ddx2, ddy2] of [[1,0],[-1,0],[0,1],[0,-1]]){
+const nx = cx2 + ddx2, ny = cy2 + ddy2;
+if (nx < 0 || ny < 0 || nx >= 13 || ny >= 13) continue;
+const d = this.dist[ny][nx];
+if (d < bestD2) { bestD2 = d; better = { cx: nx, cy: ny }; }
+}
+if (better){ this.prevGoal = this.goal; this.goal = better; }
+else {
+this.prevGoal = this.goal;
 this.pickGoal();
+if (this.goal && this.prevGoal && this.goal.cx === this.prevGoal.cx && this.goal.cy === this.prevGoal.cy){
+if (this.brickAhead()){ if (t.fireCd <= 0) w.fire(t); }
+else {
+const fx2 = 6 * 32 + 16, fy2 = 11 * 32 + 16;
+const ddx3 = fx2 - (t.x + 16), ddy3 = fy2 - (t.y + 16);
+if (Math.abs(ddx3) > Math.abs(ddy3)) t.dir = ddx3 > 0 ? DIR.RIGHT : DIR.LEFT;
+else t.dir = ddy3 > 0 ? DIR.DOWN : DIR.UP;
+if (t.fireCd <= 0) w.fire(t);
+}
+this.fireTimer = Math.min(this.fireTimer, 0.6);
+return;
+}
+}
 }
 const cur = DIRV[t.dir];
 const curGood = !this.moveFailed && ((cur[0] !== 0 && cur[0] === Math.sign(dx) && Math.abs(dx) > 2)
@@ -745,16 +816,16 @@ const ctx = this.ctx;
 this.engineOsc = ctx.createOscillator();
 this.engineGain = ctx.createGain();
 this.engineOsc.type = 'sawtooth';
-this.engineOsc.frequency.value = 55;
-this.engineGain.gain.value = 0.05;
-const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 220;
+this.engineOsc.frequency.value = 46;
+this.engineGain.gain.value = 0.03;
+const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 150;
 this.engineOsc.connect(f); f.connect(this.engineGain); this.engineGain.connect(this.master);
 this.engineOsc.start();
 }
 setEngine(on){
 if (!this.ctx) return;
 if (on && !this.engineOsc) this.startEngine();
-if (this.engineGain) this.engineGain.gain.setTargetAtTime(on ? 0.05 : 0, this.ctx.currentTime, 0.05);
+if (this.engineGain) this.engineGain.gain.setTargetAtTime(on ? 0.03 : 0, this.ctx.currentTime, 0.05);
 if (!on && this.engineOsc && this.engineGain){
 const o = this.engineOsc;
 setTimeout(() => { try { o.stop(); } catch(e){} }, 200);
