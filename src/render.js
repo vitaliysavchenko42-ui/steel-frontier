@@ -1,13 +1,13 @@
-// Рендер v3: естественная палитра, типизированные враги, бонусы
+// Рендер v4: тени, свечение пуль, трещины кирпича, мягкая вода, фактура пола
 
-import { GRID, CELL, ARENA, BULLET, T, DIR, BONUS_LIST } from './config.js?v=3';
+import { GRID, CELL, ARENA, BULLET, T, DIR, BONUS_LIST } from './config.js?v=4';
 import { BASE_CELL } from './level.js?v=3';
 
 const BRICK_A = '#c06a3a', BRICK_B = '#9a4a28', MORTAR = '#6b3020';
 const STEEL_L = '#e4e9ef', STEEL_M = '#a9b2bd', STEEL_D = '#67707e';
-const WATER_A = '#2b6ea8', WATER_B = '#5aa8dc';
-const FOREST_A = '#2e6b2e', FOREST_B = '#57a24a';
-const FLOOR_A = '#3a3a30', FLOOR_B = '#414138';
+const WATER_A = '#1f5f96', WATER_B = '#4d94d4', WATER_C = '#8ec6ec';
+const FOREST_A = '#265426', FOREST_B = '#3d8238', FOREST_C = '#63b054';
+const FLOOR_A = '#3a3a30', FLOOR_B = '#42423a';
 const WALL_D = '#3d3d46', WALL_L = '#8f8f99';
 
 const TYPE_COLORS = {
@@ -20,11 +20,17 @@ const TYPE_COLORS = {
 };
 
 function drawFloorTile(ctx, gx, gy) {
+  const x = gx * CELL, y = gy * CELL;
   ctx.fillStyle = (gx + gy) % 2 === 0 ? FLOOR_A : FLOOR_B;
-  ctx.fillRect(gx * CELL, gy * CELL, CELL, CELL);
+  ctx.fillRect(x, y, CELL, CELL);
+  if ((gx * 7 + gy * 13) % 5 === 0) {
+    ctx.fillStyle = 'rgba(255,255,255,0.035)';
+    ctx.fillRect(x + 3, y + 9, 3, 2);
+    ctx.fillRect(x + 10, y + 4, 2, 2);
+  }
 }
 
-function drawBrickTile(ctx, gx, gy) {
+function drawBrickTile(ctx, gx, gy, cracked) {
   const x = gx * CELL, y = gy * CELL;
   ctx.fillStyle = MORTAR;
   ctx.fillRect(x, y, CELL, CELL);
@@ -36,6 +42,19 @@ function drawBrickTile(ctx, gx, gy) {
   ctx.fillRect(x, y + 5, 7, 2);
   ctx.fillRect(x + 9, y + 5, 7, 2);
   ctx.fillRect(x + 4, y + 14, 7, 2);
+  if (cracked) {
+    ctx.strokeStyle = 'rgba(26,12,6,0.9)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(x + 3, y + 1);
+    ctx.lineTo(x + 5, y + 6);
+    ctx.lineTo(x + 2, y + 10);
+    ctx.lineTo(x + 6, y + 15);
+    ctx.moveTo(x + 13, y + 2);
+    ctx.lineTo(x + 10, y + 8);
+    ctx.lineTo(x + 13, y + 14);
+    ctx.stroke();
+  }
 }
 
 function drawSteelTile(ctx, gx, gy) {
@@ -55,10 +74,12 @@ function drawWaterTile(ctx, gx, gy, time) {
   const x = gx * CELL, y = gy * CELL;
   ctx.fillStyle = WATER_A;
   ctx.fillRect(x, y, CELL, CELL);
+  const w1 = Math.sin(time * 1.6 + gx * 0.9 + gy * 0.6);
+  const w2 = Math.sin(time * 1.6 + gx * 0.9 + gy * 0.6 + 2.1);
   ctx.fillStyle = WATER_B;
-  const ph = Math.sin(time * 2.2 + (gx * 0.8 + gy * 1.3)) > 0 ? 2 : 5;
-  ctx.fillRect(x, y + ph, CELL, 2);
-  ctx.fillRect(x, y + 11, CELL, 2);
+  ctx.fillRect(x, y + 4 + w1 * 2, CELL, 2);
+  ctx.fillStyle = WATER_C;
+  ctx.fillRect(x, y + 10 + w2 * 2, CELL, 1.5);
 }
 
 function drawForestTile(ctx, gx, gy, time) {
@@ -66,12 +87,13 @@ function drawForestTile(ctx, gx, gy, time) {
   ctx.fillStyle = FOREST_A;
   ctx.fillRect(x, y, CELL, CELL);
   ctx.fillStyle = FOREST_B;
-  if (Math.sin(time * 3 + gx * 2 + gy) > 0.4) {
-    ctx.fillRect(x + 2, y + 2, 4, 4);
-    ctx.fillRect(x + 9, y + 7, 4, 4);
+  ctx.fillRect(x + 1, y + 2, 6, 4);
+  ctx.fillRect(x + 9, y + 8, 5, 4);
+  if (Math.sin(time * 2 + gx * 2.1 + gy * 1.7) > 0.2) {
+    ctx.fillStyle = FOREST_C;
+    ctx.fillRect(x + 3, y + 1, 3, 3);
+    ctx.fillRect(x + 10, y + 9, 3, 3);
   }
-  ctx.fillRect(x + 4, y + 9, 3, 3);
-  ctx.fillRect(x + 10, y + 3, 3, 3);
 }
 
 function drawWallTile(ctx, gx, gy) {
@@ -121,23 +143,21 @@ function drawTank(ctx, t, time) {
   let c = t.role === 'player' ? TYPE_COLORS.player : (TYPE_COLORS[t.type] || TYPE_COLORS.basic);
   const carrier = t.flash && Math.floor(time * 8) % 2 === 0;
   if (carrier) c = { body: '#d43a2a', dark: '#8a1c14', light: '#ff705c', turret: '#ffb8a4' };
+  ctx.fillStyle = 'rgba(0,0,0,0.28)';
+  ctx.fillRect(x + 2, y + 3, s, s);
   const hw = Math.max(3, Math.round(s * 0.12));
-  // гусеницы
   ctx.fillStyle = c.dark;
   ctx.fillRect(x, y, s, hw);
   ctx.fillRect(x, y + s - hw, s, hw);
-  const anim = Math.floor(time * 10) % 2 === 0;
   ctx.fillStyle = c.light;
   for (let i = 0; i < 4; i++) {
     ctx.fillRect(x + 2 + i * Math.round(s / 4), y + Math.round(hw / 4), Math.max(2, Math.round(s / 8)), Math.max(1, Math.round(hw / 2)));
     ctx.fillRect(x + Math.round(s / 4) * (3 - i) + 2, y + s - hw - 1, Math.max(2, Math.round(s / 8)), Math.max(1, Math.round(hw / 2)));
   }
-  // корпус
   ctx.fillStyle = c.body;
   ctx.fillRect(x + hw - 1, y + hw - 1, s - hw * 2 + 2, s - hw * 2 + 2);
   ctx.fillStyle = c.dark;
   ctx.fillRect(x + hw - 1, y + hw - 1, s - hw * 2 + 2, 2);
-  // башня
   ctx.fillStyle = c.turret;
   ctx.fillRect(x + Math.round(s * 0.34), y + Math.round(s * 0.34), Math.round(s * 0.32), Math.round(s * 0.32));
   ctx.fillStyle = c.dark;
@@ -147,7 +167,6 @@ function drawTank(ctx, t, time) {
   else if (t.dir === DIR.DOWN) ctx.fillRect(bx0, y + s - bl - 1, bw, bl);
   else if (t.dir === DIR.LEFT) ctx.fillRect(x + 1, by0, bl, bw);
   else ctx.fillRect(x + s - bl - 1, by0, bl, bw);
-  // урон у брони
   if (t.role === 'enemy' && t.maxHp > 1 && t.hp < t.maxHp) {
     ctx.fillStyle = 'rgba(20,16,12,0.35)';
     ctx.fillRect(x + hw - 1, y + hw - 1, s - hw * 2 + 2, s - hw * 2 + 2);
@@ -156,14 +175,12 @@ function drawTank(ctx, t, time) {
       ctx.fillRect(x + hw - 1, y + hw - 1, s - hw * 2 + 2, s - hw * 2 + 2);
     }
   }
-  // полоска HP босса
   if (t.type === 'boss') {
     ctx.fillStyle = '#2a2a30';
     ctx.fillRect(x - 4, y - 8, s + 8, 4);
     ctx.fillStyle = '#d43a2a';
     ctx.fillRect(x - 4, y - 8, Math.round((s + 8) * (t.hp / t.maxHp)), 4);
   }
-  // щит
   if (t.shield > 0) {
     const blink = t.shield < 0.7 ? (Math.floor(time * 12) % 2 === 0) : true;
     if (blink) {
@@ -176,7 +193,12 @@ function drawTank(ctx, t, time) {
 
 function drawBullet(ctx, b) {
   const x = Math.round(b.x), y = Math.round(b.y);
-  ctx.fillStyle = '#ffe890';
+  const c = b.color || '#ffe890';
+  ctx.globalAlpha = 0.35;
+  ctx.fillStyle = c;
+  ctx.fillRect(x + 2, y + 2, BULLET - 4, BULLET - 4);
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = c;
   ctx.fillRect(x + 4, y + 4, BULLET - 8, BULLET - 8);
   ctx.fillStyle = '#fff8d0';
   ctx.fillRect(x + 6, y + 6, 4, 4);
@@ -242,9 +264,10 @@ export function draw(ctx, game) {
   if (!game.grid) return;
   for (let gy = 0; gy < GRID; gy++) {
     for (let gx = 0; gx < GRID; gx++) {
-      const t = game.grid[gy * GRID + gx];
+      const i = gy * GRID + gx;
+      const t = game.grid[i];
       drawFloorTile(ctx, gx, gy);
-      if (t === T.BRICK) drawBrickTile(ctx, gx, gy);
+      if (t === T.BRICK) drawBrickTile(ctx, gx, gy, !!game.brickHp && game.brickHp[i] === 1);
       else if (t === T.STEEL) drawSteelTile(ctx, gx, gy);
       else if (t === T.WATER) drawWaterTile(ctx, gx, gy, time);
       else if (t === T.WALL) drawWallTile(ctx, gx, gy);
@@ -266,7 +289,6 @@ export function draw(ctx, game) {
     ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size);
     ctx.globalAlpha = 1;
   }
-  // заморозка — холодная вуаль
   if (game.freezeT > 0) {
     ctx.fillStyle = 'rgba(143,212,255,0.10)';
     ctx.fillRect(0, 0, ARENA, ARENA);
