@@ -462,7 +462,7 @@ const { Engine } = C;
 const { EnemyAI } = C;
 const { makeRng } = C;
 const BONUS_TYPES = ['grenade','helmet','star','shovel','tank','clock','raft'];
-const SPAWN_INTERVAL = 3;
+const SPAWN_INTERVAL = 2.5;
 const BONUS_LIFE = 30;
 const APPROACHES = [[6,11],[5,10],[7,10],[4,11],[8,11],[6,9]];
 class Game {
