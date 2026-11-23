@@ -1,7 +1,7 @@
-// Движок v2: типы врагов, апгрейды, бонусы, эффекты, A*-навигация
+// Движок v4: сниженные скорости, кирпич в 2 попадания с трещинами
 
-import { GRID, CELL, ARENA, TANK, BULLET, T, DIR, DX, DY, PLAYER, ENEMY_TYPES, BONUS, BONUS_TTL, BONUS_DROP, BONUS_SCORE, LEVEL_SCORE, solidTank } from './config.js?v=2';
-import { buildLevel, getCfg, compositionFor, PLAYER_CELL, ENEMY_CELLS, BASE_CELL, BASE_RING, LAST_CAMPAIGN_LEVEL } from './level.js?v=2';
+import { GRID, CELL, ARENA, TANK, BULLET, T, DIR, DX, DY, PLAYER, ENEMY_TYPES, BONUS, BONUS_TTL, BONUS_DROP, BONUS_SCORE, LEVEL_SCORE, solidTank } from './config.js?v=4';
+import { buildLevel, getCfg, compositionFor, PLAYER_CELL, ENEMY_CELLS, BASE_CELL, BASE_RING, LAST_CAMPAIGN_LEVEL } from './level.js?v=3';
 
 export function createTank(role, type, cellX, cellY, dir, flash) {
   const st = role === 'player' ? null : ENEMY_TYPES[type];
@@ -33,6 +33,7 @@ export function createTank(role, type, cellX, cellY, dir, flash) {
 export function createGame() {
   return {
     grid: null,
+    brickHp: null,
     tanks: [], bullets: [], particles: [], bonuses: [],
     state: 'menu', mode: 'campaign',
     score: 0, lives: PLAYER.lives, power: 1,
@@ -48,6 +49,8 @@ export function createGame() {
 export function startLevel(game, num, mode) {
   const built = buildLevel(num);
   game.grid = built.grid;
+  game.brickHp = new Uint8Array(GRID * GRID);
+  for (let i = 0; i < game.brickHp.length; i++) if (game.grid[i] === T.BRICK) game.brickHp[i] = 2;
   game.mode = mode;
   game.level = num;
   game.tanks.length = 0;
@@ -243,7 +246,13 @@ function stepBullets(game, dt) {
         if (gx < 0 || gy < 0 || gx >= GRID || gy >= GRID) continue;
         const t = game.grid[gy * GRID + gx];
         if (t === T.BASE) { b.alive = false; hit = true; game.events.push({ type: 'basehit' }); game.state = 'over'; boom(game, b.x + 8, b.y + 8, true); }
-        else if (t === T.BRICK) { game.grid[gy * GRID + gx] = T.EMPTY; game.events.push({ type: 'brick' }); b.alive = false; hit = true; boom(game, b.x + 8, b.y + 8, false); }
+        else if (t === T.BRICK) {
+          const idx = gy * GRID + gx;
+          game.brickHp[idx] = Math.max(0, (game.brickHp[idx] || 2) - 1);
+          if (game.brickHp[idx] <= 0) { game.grid[idx] = T.EMPTY; game.events.push({ type: 'brick' }); }
+          else game.events.push({ type: 'brickhit' });
+          b.alive = false; hit = true; boom(game, b.x + 8, b.y + 8, false);
+        }
         else if (t === T.STEEL) {
           if (b.breaksSteel) { game.grid[gy * GRID + gx] = T.EMPTY; game.events.push({ type: 'steelbreak' }); }
           else game.events.push({ type: 'clank' });
@@ -351,7 +360,6 @@ function aiUpdate(game, e, dt) {
       e.path = astarPath(game, cellOf(e.x), cellOf(e.y), goalX, goalY);
       e.pathT = 1.2 + Math.random() * 0.8;
       if (e.path && e.path.length) {
-        // первый шаг пути = собственная клетка, срезаем
         const p0 = e.path[0];
         if (p0[0] === cellOf(e.x) && p0[1] === cellOf(e.y)) e.path.shift();
       }
@@ -368,7 +376,6 @@ function aiUpdate(game, e, dt) {
     if (Math.abs(cx - e.x) < 1.2 && Math.abs(cy - e.y) < 1.2) e.path.shift();
     if (!movedOk) e.path = null;
   } else {
-    // fallback: жадное движение к цели
     const ddx = tx - (e.x + e.size / 2), ddy = ty - (e.y + e.size / 2);
     const candidates = [];
     if (Math.abs(ddx) >= Math.abs(ddy)) {
@@ -387,7 +394,6 @@ function aiUpdate(game, e, dt) {
     }
   }
 
-  // детектор застревания
   if (Math.abs(e.x - e.lastX) < 0.1 && Math.abs(e.y - e.lastY) < 0.1) {
     e.stuckT += dt;
     if (e.stuckT > 1.5) {
@@ -401,7 +407,6 @@ function aiUpdate(game, e, dt) {
     e.lastX = e.x; e.lastY = e.y;
   }
 
-  // стрельба
   e.fireTimer -= dt;
   if (e.fireTimer <= 0) {
     const aligned = Math.abs((e.x + e.size / 2) - tx) < 14 || Math.abs((e.y + e.size / 2) - ty) < 14;
