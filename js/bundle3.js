@@ -688,6 +688,10 @@ ctx.fillText('РЕКОРД: ' + records[0].score + ' · УРОВЕНЬ ' + recor
 }
 ctx.textAlign = 'left';
 }
+function fmtRecDate(d){
+const m = (typeof d === 'string') ? /^(\d{4})-(\d{2})-(\d{2})/.exec(d) : null;
+return m ? m[3] + '.' + m[2] + '.' + m[1].slice(2) : '—';
+}
 function drawMenu(ctx, menu, time){
 ctx.fillStyle = '#0c1018';
 ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
@@ -724,11 +728,17 @@ ctx.fillStyle = '#8a94a8';
 ctx.fillText('ПОКА ПУСТО — СЫГРАЙ ПАРТИЮ', CANVAS_W/2, 150);
 } else {
 const top = recs.slice(0, 10);
+ctx.textAlign = 'left';
 ctx.fillStyle = '#e8e8f0';
-ctx.fillText('СЧЁТ      УРОВЕНЬ', CANVAS_W/2, 106);
+ctx.fillText('СЧЁТ', CANVAS_W/2 - 96, 106);
+ctx.fillText('УР.', CANVAS_W/2 - 27, 106);
+ctx.fillText('ДАТА', CANVAS_W/2 + 51, 106);
 top.forEach((rec, i) => {
 ctx.fillStyle = i === 0 ? '#e8c840' : '#9aa4b8';
-ctx.fillText(String(rec.score).padStart(6, ' ') + '   УР. ' + (rec.level || 1), CANVAS_W/2, 136 + i * 26);
+const ly = 136 + i * 26;
+ctx.fillText(String(rec.score).padStart(6, ' '), CANVAS_W/2 - 96, ly);
+ctx.fillText('УР. ' + (rec.level || 1), CANVAS_W/2 - 27, ly);
+ctx.fillText(fmtRecDate(rec.date), CANVAS_W/2 + 51, ly);
 });
 }
 ctx.font = '11px "Courier New", monospace';
@@ -788,7 +798,7 @@ const prog = Math.min(1, (time - start) / 0.45);
 const sum = Math.floor(count * row.pts * prog);
 ctx.font = '15px "Courier New", monospace';
 ctx.fillStyle = '#e8e8f0';
-drawMiniTank(ctx, CANVAS_W/2 - 80, y, row.color);
+drawTank(ctx, CANVAS_W/2 - 96, y, 1, 'enemy', { type: row.type, hp: 3, power: 1 }, 0);
 ctx.fillText('× ' + count + '   ' + sum + ' PT', CANVAS_W/2 + 30, y + 4);
 }
 y += 42;
