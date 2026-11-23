@@ -164,7 +164,32 @@ if (!b.alive) break;
 const hit = rectHitsTiles(b.x, b.y, b.w, b.h, this.tiles, SOLID_FOR_BULLET);
 if (hit){
 const wasFlag = this.tiles[hit.ty][hit.tx] === T.FLAG;
+const wasBrick = this.tiles[hit.ty][hit.tx] === T.BRICK;
 this.damageTile(hit.tx, hit.ty, b.power, b);
+if (wasBrick && b.owner){
+const ow = b.owner;
+if (dx !== 0){
+const r0 = Math.floor(ow.y / CELL), r1 = Math.floor((ow.y + TANK - 1) / CELL);
+let nty = null, bestOv = 0;
+for (let r = r0; r <= r1; r++){
+if (r === hit.ty || r < 0 || r >= ROWS) continue;
+const ov = Math.min(ow.y + TANK, (r + 1) * CELL) - Math.max(ow.y, r * CELL);
+if (ov > bestOv){ bestOv = ov; nty = r; }
+}
+if (nty !== null && this.tiles[nty] && this.tiles[nty][hit.tx] === T.BRICK)
+this.damageTile(hit.tx, nty, b.power, b);
+} else {
+const c0 = Math.floor(ow.x / CELL), c1 = Math.floor((ow.x + TANK - 1) / CELL);
+let ntx = null, bestOv = 0;
+for (let c = c0; c <= c1; c++){
+if (c === hit.tx || c < 0 || c >= COLS) continue;
+const ov = Math.min(ow.x + TANK, (c + 1) * CELL) - Math.max(ow.x, c * CELL);
+if (ov > bestOv){ bestOv = ov; ntx = c; }
+}
+if (ntx !== null && this.tiles[hit.ty] && this.tiles[hit.ty][ntx] === T.BRICK)
+this.damageTile(ntx, hit.ty, b.power, b);
+}
+}
 if (b.owner && b.owner.power >= 4){
 const [ox, oy] = dx !== 0 ? [0, 1] : [1, 0];
 this.damageTile(hit.tx + ox, hit.ty + oy, b.power, b);
