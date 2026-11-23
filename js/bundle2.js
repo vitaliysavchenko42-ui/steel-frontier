@@ -103,8 +103,17 @@ else if (dir === 2) { front = [0,1]; back = [2,3]; }
 else if (dir === 1) { front = [0,2]; back = [1,3]; }
 else { front = [1,3]; back = [0,2]; }
 const alive = (s) => (hp & (1 << s)) !== 0;
+const hp0 = hp;
 if (front.every(alive)) { for (const s of front) hp &= ~(1 << s); }
 else { for (const s of back) hp &= ~(1 << s); }
+if (hp === hp0 && b){ // слой уже разрушен: доламываем то, что реально задела пуля
+for (let sy = 0; sy < 2; sy++) for (let sx = 0; sx < 2; sx++){
+const s = sy * 2 + sx;
+if (!(hp & (1 << s))) continue;
+const qx = tx * CELL + sx * 8, qy = ty * CELL + sy * 8;
+if (b.x < qx + 8 && b.x + b.w > qx && b.y < qy + 8 && b.y + b.h > qy) hp &= ~(1 << s);
+}
+}
 this.tileHp[key] = hp;
 if (hp === 0) this.tiles[ty][tx] = T.EMPTY;
 return true;
@@ -161,7 +170,22 @@ break;
 }
 }
 if (!b.alive) break;
-const hit = rectHitsTiles(b.x, b.y, b.w, b.h, this.tiles, SOLID_FOR_BULLET);
+const bx1 = Math.max(0, Math.floor(b.x / CELL)), by1 = Math.max(0, Math.floor(b.y / CELL));
+const bx2 = Math.min(COLS-1, Math.ceil((b.x + b.w) / CELL) - 1), by2 = Math.min(ROWS-1, Math.ceil((b.y + b.h) / CELL) - 1);
+let hit = null;
+for (let ty = by1; ty <= by2 && !hit; ty++) for (let tx = bx1; tx <= bx2 && !hit; tx++){
+const tv = this.tiles[ty][tx];
+if (tv === T.BRICK){
+const hpb = (this.tileHp[ty * COLS + tx] === undefined) ? 15 : this.tileHp[ty * COLS + tx];
+for (let sy = 0; sy < 2 && !hit; sy++) for (let sx = 0; sx < 2 && !hit; sx++){
+if (!(hpb & (1 << (sy * 2 + sx)))) continue;
+const qx = tx * CELL + sx * 8, qy = ty * CELL + sy * 8;
+if (b.x < qx + 8 && b.x + b.w > qx && b.y < qy + 8 && b.y + b.h > qy) hit = { tx, ty };
+}
+continue;
+}
+if (SOLID_FOR_BULLET(tv)) hit = { tx, ty };
+}
 if (hit){
 const wasFlag = this.tiles[hit.ty][hit.tx] === T.FLAG;
 const wasBrick = this.tiles[hit.ty][hit.tx] === T.BRICK;
@@ -462,7 +486,7 @@ const { Engine } = C;
 const { EnemyAI } = C;
 const { makeRng } = C;
 const BONUS_TYPES = ['grenade','helmet','star','shovel','tank','clock','raft'];
-const SPAWN_INTERVAL = 2.5;
+const SPAWN_BASE = 2.5;
 const BONUS_LIFE = 30;
 const APPROACHES = [[6,11],[5,10],[7,10],[4,11],[8,11],[6,9]];
 class Game {
@@ -470,429 +494,5 @@ constructor(level, opts){
 opts = opts || {};
 this.level = level;
 this.budget = enemyBudget(level);
+this.spawnInterval = SPAWN_BASE / (this.budget.speedMul || 1);
 this.rng = makeRng(level * 104729 + 77);
-this.onSound = opts.onSound || function(){};
-this.onEvent = opts.onEvent || function(){};
-this.state = 'playing';
-this.lives = opts.lives || 3;
-this.playerPower = opts.playerPower || 1;
-this.time = 0; this.levelTime = 0;
-this.enemiesRemaining = this.budget.total;
-this.spawnQueue = [];
-this.enemiesOnField = 0;
-this.enemyAis = new Map();
-this.spawnIdx = 0;
-this.lastSpawnAt = -999;
-this.respawnQueue = [];
-this.baseShovel = 0;
-this.freezeTimer = 0;
-this.stats = { kills:0, score:0, bonuses:0, time:0 };
-this.explosions = [];
-this.sparkles = [];
-this.debris = []; // обломки брони при смерти танка
-this.splashes = []; // брызги крови при попадании в штаб
-this.startLevel();
-const E = this.engine;
-E.onShot = (tank) => this.onSound('shoot', !!tank.isPlayer);
-E.onHit = (x, y, kind) => {
-if (kind === 'steel') this.onSound('ricochet');
-if (kind === 'tank') this.onSound('hit');
-if (kind === 'base' && typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([100, 60, 100]);
-if (kind === 'base'){
-this.onSound('baseDestroyed');
-this.explosions.push({ x: 16 + x, y: 56 + y, t0: this.time, dur: 1.4, big: true, seed: Math.random() * 6 });
-this.splashes.push({ x: 16 + x, y: 56 + y, t0: this.time });
-}
-this.sparkles.push({ x: 16 + x, y: 56 + y, t0: this.time, dur: 0.28 });
-};
-E.onClash = (x, y) => {
-this.onSound('ricochet');
-this.sparkles.push({ x: 16 + x, y: 56 + y, t0: this.time, dur: 0.35 });
-};
-E.onDeath = (t) => {
-this.explosions.push({ x: 16 + t.x + 16, y: 56 + t.y + 16, t0: this.time,
-dur: t.isPlayer ? 0.9 : 0.55, big: t.isPlayer || t.type === 'armor', seed: Math.random() * 6 });
-const dseed = Math.random() * 6;
-for (let i = 0; i < 9; i++){
-const ang = i * 2 * Math.PI / 9 + dseed;
-this.debris.push({ x: 16 + t.x + 16, y: 56 + t.y + 16, dx: Math.cos(ang), dy: Math.sin(ang),
-t0: this.time, dur: 0.7, red: i % 3 === 0 });
-}
-if (t.isPlayer && typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([150, 60, 150]);
-if (!t.isPlayer){ this.onSound('explosion', false); this.respawnQueue.push(this.time); }
-};
-}
-startLevel(){
-const m = C.MapGen.generateMap(this.level);
-this.engine = new Engine(m.tiles);
-this.map = m;
-this.mapTilesOrig = m.tiles.map(r => r.slice());
-const [px, py] = cellPx(PLAYER_CELL[0], PLAYER_CELL[1]);
-this.player = this.engine.addTank({
-x: px, y: py, dir: DIR.UP, isPlayer: true,
-speed: 46, hp: 1, shield: 3.5,
-bulletSpeed: this.playerPower >= 4 ? 220 : (this.playerPower >= 2 ? 195 : 150),
-fireRate: 0.42, power: this.playerPower,
-maxBullets: this.playerPower >= 3 ? 2 : 1,
-});
-const b = this.budget;
-this.spawnQueue = [];
-for (let i = 0; i < b.total; i++){
-const r = this.rng.next();
-let type = 'basic';
-if (r < b.pArmor) type = 'armor';
-else if (r < b.pArmor + b.pSniper) type = 'sniper';
-else if (r < b.pArmor + b.pSniper + b.pFast) type = 'fast';
-const elite = (i === 3 || i === 10);
-this.spawnQueue.push({ type, elite,
-speed: ENEMY_TYPES[type].speed * b.speedMul,
-bulletSpeed: ENEMY_TYPES[type].bulletSpeed,
-fireRate: Math.max(0.35, ENEMY_TYPES[type].fire / b.fireMul),
-});
-}
-this.enemiesRemaining = this.spawnQueue.length;
-this.levelTime = 0;
-let spawnedNow = 0;
-for (let s = 0; s < 3; s++) if (this.spawnEnemy()) spawnedNow++;
-this.enemiesRemaining -= spawnedNow;
-}
-nextEnemyCell(){
-for (let i = 0; i < ENEMY_CELLS.length; i++){
-const idx = (this.spawnIdx + i) % ENEMY_CELLS.length;
-const [cx, cy] = ENEMY_CELLS[idx];
-const [x, y] = cellPx(cx, cy);
-const occupied = this.engine.tanks.some(t => t.alive && Math.abs(t.x - x) < 40 && Math.abs(t.y - y) < 40);
-if (!occupied) return { x, y, cx, cy, idx };
-}
-return null;
-}
-spawnEnemy(){
-const spot = this.nextEnemyCell();
-if (!spot) return false;
-const spec = this.spawnQueue.shift();
-const t = ENEMY_TYPES[spec.type];
-const tank = this.engine.addTank({
-x: spot.x, y: spot.y, dir: DIR.DOWN, type: spec.type,
-speed: spec.speed, hp: t.hp, bulletSpeed: spec.bulletSpeed,
-fireRate: spec.fireRate, elite: spec.elite, bonusDrop: spec.elite,
-spawnFlash: 2.0, maxBullets: spec.type === 'sniper' ? 2 : 1,
-});
-const approach = APPROACHES[Math.floor(this.rng.next() * APPROACHES.length)];
-this.spawnIdx = (spot.idx + 1) % ENEMY_CELLS.length;
-const ai = new EnemyAI(this.engine, tank, BASE_CELL, { fireMul: this.budget.fireMul, approach, fireRate: spec.fireRate });
-this.enemyAis.set(tank, ai);
-this.enemiesOnField++;
-this.onSound('spawn');
-return true;
-}
-dropBonus(x, y){
-const type = this.rng.pick(BONUS_TYPES);
-this.engine.bonuses.push({ x: x + 16 - 12, y: y + 16 - 12, w: 24, h: 24, type, alive: true, t: 0, t0: this.time });
-this.onSound('bonusDrop');
-}
-applyBonus(type){
-const p = this.player;
-this.stats.bonuses++;
-this.onSound('bonus');
-switch(type){
-case 'grenade': {
-for (const t of this.engine.tanks){
-if (!t.isPlayer && t.alive){
-t.alive = false;
-this.engine.stats.score += ENEMY_TYPES[t.type].score;
-this.engine.stats.kills++;
-this.onEvent('explosion', t.x, t.y);
-this.respawnQueue.push(this.time);
-this.explosions.push({ x: 16 + t.x + 16, y: 56 + t.y + 16, t0: this.time, dur: 0.8, big: true, seed: Math.random() * 6 });
-}
-}
-this.onSound('explosion', true);
-break;
-}
-case 'helmet': p.shield = Math.max(p.shield, 10); break;
-case 'star': {
-p.power = Math.min(4, (p.power || 1) + 1);
-if (p.power >= 2) p.bulletSpeed = Math.round(150 * 1.3);
-if (p.power >= 3) p.maxBullets = 2;
-if (p.power >= 4) p.bulletSpeed = 220;
-this.playerPower = p.power;
-break;
-}
-case 'shovel': {
-this.baseShovel = 15;
-const mTiles = this.engine.tiles;
-const F = FLAG;
-for (let y = F[1]-1; y <= F[3]+1; y++)
-for (let x = F[0]-1; x <= F[2]+1; x++){
-const isFlag = x >= F[0] && y >= F[1] && x <= F[2] && y <= F[3];
-const edge = (y === F[1]-1 || y === F[3]+1 || x === F[0]-1 || x === F[2]+1);
-if (edge) mTiles[y][x] = 2;
-}
-break;
-}
-case 'tank': this.lives++; break;
-case 'raft': p.raft = true; break;
-case 'clock': this.freezeTimer = 8; for (const t of this.engine.tanks) if (!t.isPlayer) t.frozen = 8; break;
-}
-}
-pickupBonuses(){
-const p = this.player;
-for (const b of this.engine.bonuses){
-if (!b.alive) continue;
-if (p.x < b.x + b.w && p.x + 32 > b.x && p.y < b.y + b.h && p.y + 32 > b.y){
-b.alive = false;
-this.applyBonus(b.type);
-}
-}
-this.engine.bonuses = this.engine.bonuses.filter(b => b.alive);
-}
-playerInput(input, dt){
-const p = this.player;
-if (!p.alive || this.state !== 'playing') return;
-if (input.dir !== undefined && input.dir !== null){
-this.engine.moveTank(p, input.dir, dt);
-} else p.moving = false;
-if (input.fire) this.engine.fire(p);
-}
-killPlayer(){
-const p = this.player;
-p.alive = false;
-this.lives--;
-this.playerPower = 1;
-if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([150, 60, 150]);
-this.onSound('playerDeath');
-this.onEvent('explosion', p.x, p.y);
-if (this.lives <= 0){
-this.state = 'gameover';
-return;
-}
-const [px, py] = cellPx(PLAYER_CELL[0], PLAYER_CELL[1]);
-this.player = this.engine.addTank({
-x: px, y: py, dir: DIR.UP, isPlayer: true,
-speed: 46, hp: 1, shield: 3.5,
-bulletSpeed: this.playerPower >= 4 ? 220 : (this.playerPower >= 2 ? 195 : 150),
-fireRate: 0.42, power: this.playerPower,
-maxBullets: this.playerPower >= 3 ? 2 : 1,
-});
-}
-step(dt, input){
-if (this.state !== 'playing') return;
-this.time += dt; this.levelTime += dt;
-this.explosions = this.explosions.filter(e => this.time - e.t0 < e.dur);
-this.sparkles = this.sparkles.filter(e => this.time - e.t0 < e.dur);
-this.debris = this.debris.filter(e => this.time - e.t0 < e.dur);
-this.splashes = this.splashes.filter(e => this.time - e.t0 < 0.9);
-const w = this.engine;
-this.enemiesOnField = w.tanks.filter(t => !t.isPlayer && t.alive).length;
-if (this.enemiesRemaining > 0 && this.enemiesOnField < this.budget.maxOn){
-if (this.respawnQueue.length === 0){
-if (this.time - this.lastSpawnAt >= SPAWN_INTERVAL){
-if (this.spawnEnemy()){ this.enemiesRemaining--; this.lastSpawnAt = this.time; }
-}
-} else if (this.time - this.respawnQueue[0] >= SPAWN_INTERVAL && this.time - this.lastSpawnAt >= SPAWN_INTERVAL){
-if (this.spawnEnemy()){
-this.enemiesRemaining--;
-this.respawnQueue.shift();
-this.lastSpawnAt = this.time;
-}
-}
-}
-if (this.freezeTimer > 0) this.freezeTimer -= dt;
-w.playerX = this.player.alive ? this.player.x : undefined;
-w.playerY = this.player.alive ? this.player.y : undefined;
-for (const t of w.tanks){
-if (t.isPlayer || !t.alive) continue;
-const ai = this.enemyAis.get(t);
-if (ai) ai.step(this.freezeTimer > 0 ? 0 : dt);
-}
-this.playerInput(input, dt);
-w.step(dt);
-if (this.baseShovel > 0){
-this.baseShovel -= dt;
-if (this.baseShovel <= 0){
-const mTiles = w.tiles, F = FLAG;
-for (let y = F[1]-1; y <= F[3]+1; y++)
-for (let x = F[0]-1; x <= F[2]+1; x++){
-const isFlag = x >= F[0] && y >= F[1] && x <= F[2] && y <= F[3];
-if (isFlag) continue;
-const edge = (y === F[1]-1 || y === F[3]+1 || x === F[0]-1 || x === F[2]+1);
-if (edge) mTiles[y][x] = 1;
-else if (mTiles[y][x] === 2 && !this.isOriginalSteel(x,y)) mTiles[y][x] = 0;
-}
-}
-}
-this.pickupBonuses();
-this.engine.bonuses = this.engine.bonuses.filter(b => this.time - (b.t0 || 0) < BONUS_LIFE);
-if (!this.player.alive && this.state === 'playing') this.killPlayer();
-let flagAlive = false;
-for (let y = FLAG[1]; y <= FLAG[3]; y++) for (let x = FLAG[0]; x <= FLAG[2]; x++)
-if (w.tiles[y][x] === 6) flagAlive = true;
-if (!flagAlive && this.state === 'playing'){
-this.state = 'gameover'; this.gameoverReason = 'base';
-}
-for (const t of w.tanks){
-if (!t.isPlayer && !t.alive && t.bonusDrop && !t.dropped){
-t.dropped = true;
-this.dropBonus(t.x, t.y);
-}
-}
-if (this.enemiesRemaining === 0 && this.enemiesOnField === 0 && this.state === 'playing'){
-this.state = 'won';
-this.stats.time = this.levelTime;
-this.stats.score = this.engine.stats.score;
-this.stats.kills = this.engine.stats.kills;
-this.stats.byType = this.engine.stats.byType || {};
-}
-}
-isOriginalSteel(x, y){
-const orig = this.mapTilesOrig;
-return orig[y][x] === 2;
-}
-}
-if (typeof window !== 'undefined') Object.assign(window.__TANKS__, { Game, BONUS_TYPES });
-})();
-(function(){
-const VOICE_LIMIT = 8;
-class SFX {
-constructor(){
-this.ctx = null; this.master = null;
-this.enabled = true;
-this.activeVoices = 0;
-this.engineOsc = null; this.engineGain = null;
-}
-ensure(){
-if (this.ctx) return true;
-const AC = (typeof window !== 'undefined') && (window.AudioContext || window.webkitAudioContext);
-if (!AC) return false;
-try {
-this.ctx = new AC();
-this.master = this.ctx.createGain();
-this.master.gain.value = 0.35;
-this.master.connect(this.ctx.destination);
-return true;
-} catch(e){ return false; }
-}
-setEnabled(v){
-this.enabled = v;
-if (this.master) this.master.gain.value = v ? 0.35 : 0;
-if (!v) this.stopEngine();
-}
-resume(){ if (!this.ctx) this.ensure(); if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); }
-voiceOk(){ return this.enabled && this.ctx && this.activeVoices < VOICE_LIMIT; }
-noiseBuffer(dur){
-const ctx = this.ctx;
-const len = Math.floor(ctx.sampleRate * dur);
-const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-const d = buf.getChannelData(0);
-for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-return buf;
-}
-playNoise(dur, freqStart, freqEnd, gain){
-if (!this.voiceOk()) return;
-this.activeVoices++;
-const ctx = this.ctx, t = ctx.currentTime;
-const src = ctx.createBufferSource();
-src.buffer = this.noiseBuffer(dur);
-const f = ctx.createBiquadFilter();
-f.type = 'lowpass';
-f.frequency.setValueAtTime(freqStart, t);
-f.frequency.exponentialRampToValueAtTime(Math.max(40, freqEnd), t + dur);
-const g = ctx.createGain();
-g.gain.setValueAtTime(gain, t);
-g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-src.connect(f); f.connect(g); g.connect(this.master);
-src.start(t); src.stop(t + dur);
-src.onended = () => { this.activeVoices--; };
-}
-playTone(freq, dur, type, gain, freqEnd){
-if (!this.voiceOk()) return;
-this.activeVoices++;
-const ctx = this.ctx, t = ctx.currentTime;
-const o = ctx.createOscillator();
-o.type = type || 'square';
-o.frequency.setValueAtTime(freq, t);
-if (freqEnd) o.frequency.exponentialRampToValueAtTime(freqEnd, t + dur);
-const g = ctx.createGain();
-g.gain.setValueAtTime(gain || 0.2, t);
-g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-o.connect(g); g.connect(this.master);
-o.start(t); o.stop(t + dur);
-o.onended = () => { this.activeVoices--; };
-}
-shoot(player){ this.playTone(player ? 560 : 420, 0.14, 'square', 0.28, 90); this.playNoise(0.10, 5000, 500, 0.30); this.playTone(player ? 170 : 130, 0.11, 'triangle', 0.20, 55); }
-ricochet(){ this.playTone(900, 0.05, 'triangle', 0.1, 500); }
-hit(){ this.playTone(880, 0.09, 'square', 0.24, 440); this.playNoise(0.07, 3600, 700, 0.2); }
-explosion(big){
-this.playNoise(big ? 0.9 : 0.5, big ? 1200 : 2200, 50, big ? 0.85 : 0.6);
-this.playTone(big ? 55 : 95, big ? 0.85 : 0.45, 'sawtooth', big ? 0.5 : 0.4, 22);
-this.playNoise(0.3, 400, 45, 0.45);
-}
-bonus(){ const n = [523, 659, 784, 1047]; n.forEach((f, i) => setTimeout(() => this.playTone(f, 0.12, 'square', 0.18), i * 70)); }
-spawn(){ this.playTone(220, 0.15, 'sawtooth', 0.08, 440); }
-tick(){ this.playTone(1240, 0.045, 'square', 0.22); } // «тюк» построчного подсчёта
-tickDone(){ this.playTone(1560, 0.09, 'square', 0.22); } // строка подсчитана
-bonusDrop(){ this.playTone(660, 0.2, 'triangle', 0.15, 990); }
-playerDeath(){ this.playNoise(0.7, 1200, 60, 0.5); this.playTone(180, 0.6, 'sawtooth', 0.3, 40); }
-baseDestroyed(){ this.playNoise(1.2, 700, 40, 0.7); this.playTone(90, 1.1, 'sawtooth', 0.4, 25); }
-levelWin(){ const n = [392, 523, 659, 784, 659, 784, 1047]; n.forEach((f, i) => setTimeout(() => this.playTone(f, 0.16, 'square', 0.2), i * 130)); }
-startEngine(){
-if (!this.enabled || !this.ctx || this.engineOsc) return;
-const ctx = this.ctx;
-this.engineOsc = ctx.createOscillator();
-this.engineGain = ctx.createGain();
-this.engineOsc.type = 'sawtooth';
-this.engineOsc.frequency.value = 46;
-this.engineGain.gain.value = 0.03;
-const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 150;
-this.engineOsc.connect(f); f.connect(this.engineGain); this.engineGain.connect(this.master);
-this.engineOsc.start();
-}
-setEngine(on){
-if (!this.ctx) return;
-if (on && !this.engineOsc) this.startEngine();
-if (this.engineGain) this.engineGain.gain.setTargetAtTime(on ? 0.03 : 0, this.ctx.currentTime, 0.05);
-if (!on && this.engineOsc && this.engineGain){
-const o = this.engineOsc;
-setTimeout(() => { try { o.stop(); } catch(e){} }, 200);
-this.engineOsc = null;
-}
-}
-stopEngine(){ this.setEngine(false); }
-playTheme(){
-if (!this.enabled || !this.ctx) return;
-const notes = [
-[164.8, 1], [164.8, 1], [196, 1], [220, 1],
-[246.9, 1], [220, 1], [196, 1], [164.8, 1],
-[146.8, 1], [164.8, 1], [196, 1], [220, 2],
-[164.8, 1], [196, 1], [220, 1], [246.9, 1],
-[261.6, 1], [246.9, 1], [220, 1], [196, 1],
-[164.8, 2], [196, 1], [220, 1],
-[196, 1], [164.8, 1], [146.8, 2],
-[164.8, 3], [0, 1],
-];
-let t = this.ctx.currentTime + 0.05;
-const beat = 0.21;
-for (const [f, len] of notes){
-if (f > 0){
-const o = this.ctx.createOscillator();
-const g = this.ctx.createGain();
-o.type = 'square'; o.frequency.value = f;
-g.gain.setValueAtTime(0.12, t);
-g.gain.setValueAtTime(0.12, t + len * beat - 0.03);
-g.gain.linearRampToValueAtTime(0.001, t + len * beat);
-const o2 = this.ctx.createOscillator();
-o2.type = 'triangle'; o2.frequency.value = f / 2;
-const g2 = this.ctx.createGain();
-g2.gain.setValueAtTime(0.07, t);
-g2.gain.linearRampToValueAtTime(0.001, t + len * beat);
-o.connect(g); o2.connect(g2);
-g.connect(this.master); g2.connect(this.master);
-o.start(t); o.stop(t + len * beat);
-o2.start(t); o2.stop(t + len * beat);
-}
-t += len * beat;
-}
-}
-}
-if (typeof window !== 'undefined') Object.assign(window.__TANKS__, { SFX });
-})();
