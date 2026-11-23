@@ -1,11 +1,9 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
+<!DOCTYPE html><html lang="ru"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#0b0b10">
 <title>Стальной Рубеж</title>
-<link rel="stylesheet" href="css/style.css?v=3">
+<link rel="stylesheet" href="css/style.css?v=4">
 </head>
 <body>
 <div id="wrap">
@@ -17,26 +15,27 @@
     <span id="hud-bonus"></span>
   </div>
   <div id="stage">
-    <canvas id="game" width="416" height="416"></canvas>
+    <canvas id="game" width="416" height="416" style="width: 928px; height: 928px;"></canvas>
     <div id="overlay">
       <div id="overlay-title">СТАЛЬНОЙ РУБЕЖ</div>
       <div id="menu">
         <button id="btn-campaign">КАМПАНИЯ</button>
         <button id="btn-endless">БЕСКОНЕЧНЫЙ</button>
       </div>
-      <div id="overlay-text">WASD/стрелки — движение · Space — огонь · M — звук</div>
+      <div id="overlay-text">WASD/стрелки — движение · Space — огонь · M — звук. На телефоне — джойстик слева и ОГОНЬ справа</div>
     </div>
   </div>
   <div id="controls">
     <div id="dpad">
-      <button class="pad" id="pad-up" data-dir="0">&#9650;</button>
-      <button class="pad" id="pad-left" data-dir="3">&#9664;</button>
-      <button class="pad" id="pad-right" data-dir="1">&#9654;</button>
-      <button class="pad" id="pad-down" data-dir="2">&#9660;</button>
+      <button class="pad" id="pad-up" data-dir="0">▲</button>
+      <button class="pad" id="pad-left" data-dir="3">◀</button>
+      <button class="pad" id="pad-right" data-dir="1">▶</button>
+      <button class="pad" id="pad-down" data-dir="2">▼</button>
     </div>
     <button id="fire">ОГОНЬ</button>
   </div>
 </div>
-<script type="module" src="src/main.js?v=3"></script>
-</body>
-</html>
+<script type="module" src="src/main.js?v=4"></script>
+
+
+</body></html>
