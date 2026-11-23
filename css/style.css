@@ -1,28 +1,65 @@
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
-html,body{height:100%;background:#0c0d10;color:#e8e2d0;font-family:'Courier New',monospace;overflow:hidden;touch-action:none}
-#wrap{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
-  padding:max(4px,env(safe-area-inset-top)) max(4px,env(safe-area-inset-right)) max(4px,env(safe-area-inset-bottom)) max(4px,env(safe-area-inset-left))}
-#hud{display:flex;gap:8px;flex:0 0 auto;white-space:nowrap}
-#hud span{background:#1b1d16;border:1px solid #4a4a3c;border-radius:6px;padding:3px 9px;font-size:12px;letter-spacing:1px;color:#cfc6a8;box-shadow:0 1px 0 rgba(0,0,0,.6)}
-#hud-bonus{color:#8fd4ff}
-#stage{position:relative;flex:1 1 auto;display:flex;align-items:center;justify-content:center;min-height:0;width:100%}
-canvas#game{background:#14141a;image-rendering:pixelated;border:2px solid #4a4a3c;border-radius:4px;max-width:100%;max-height:100%;box-shadow:0 6px 24px rgba(0,0,0,.55)}
-#overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:rgba(8,9,7,.86);cursor:pointer;border-radius:4px}
-#overlay.hidden{display:none}
-#overlay-title{font-size:26px;letter-spacing:5px;color:#ff5b3a;text-shadow:2px 2px 0 #000,0 0 18px rgba(255,91,58,.35);text-align:center}
-#overlay-text{font-size:12px;color:#cfc6a8;text-align:center;padding:0 12px;line-height:1.6}
-#menu{display:flex;flex-direction:column;gap:10px}
-#menu.hidden{display:none}
-#menu button{width:232px;padding:12px 0;font-family:inherit;font-size:15px;letter-spacing:2px;color:#efe8cf;background:linear-gradient(#3a3d2e,#262821);border:2px solid #6a6d4e;border-radius:8px;cursor:pointer;box-shadow:0 2px 0 rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.08)}
-#menu button:active{filter:brightness(1.5);transform:translateY(1px)}
-#controls{display:none;flex:0 0 auto;width:100%;max-width:560px;padding:0 10px 4px;justify-content:space-between;align-items:flex-end}
-@media (pointer:coarse){#controls{display:flex}}
-#dpad{display:grid;grid-template-columns:56px 56px 56px;grid-template-rows:56px 56px;gap:4px}
-#pad-up{grid-column:2;grid-row:1}
-#pad-left{grid-column:1;grid-row:2}
-#pad-right{grid-column:3;grid-row:2}
-#pad-down{grid-column:2;grid-row:2}
-.pad,#fire{color:#efe8cf;background:linear-gradient(#2c2f24,#1f2118);border:2px solid #6a6d4e;border-radius:10px;font-family:inherit;touch-action:none;box-shadow:0 2px 0 rgba(0,0,0,.6)}
-.pad{width:56px;height:56px;font-size:20px}
-#fire{width:96px;height:96px;border-radius:50%;background:linear-gradient(#c03a2e,#8f241b);border-color:#e0563f;font-size:15px;letter-spacing:1px}
-.pad:active,#fire:active{filter:brightness(1.5);transform:translateY(1px)}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  height: 100%;
+  background: #08080c;
+  color: #c8d0e0;
+  font-family: "Courier New", monospace;
+  overflow: hidden;
+  touch-action: none;
+}
+#stage {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+#game {
+  display: block;
+  width: min(96vmin, 640px);
+  height: auto;
+  aspect-ratio: 448 / 496;
+  image-rendering: pixelated;
+  border: 2px solid #2a2a34;
+  border-radius: 6px;
+  box-shadow: 0 0 40px rgba(60, 90, 160, 0.25);
+}
+#hint { font-size: 11px; color: #4a5468; letter-spacing: 0.5px; }
+#touch { display: none; }
+@media (pointer: coarse) {
+  #hint { display: none; }
+  #touch {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    width: min(96vmin, 640px);
+    justify-content: space-between;
+    padding: 6px 10px 14px;
+  }
+  #dpad {
+    display: grid;
+    grid-template-areas: ". u ." "l . r" ". d .";
+    gap: 4px;
+  }
+  .tbtn {
+    width: 56px; height: 56px;
+    background: #1a1e2a;
+    color: #c8d0e0;
+    border: 1px solid #343a4a;
+    border-radius: 12px;
+    font-size: 18px;
+    font-family: inherit;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+  }
+  .tbtn:active { background: #2a3145; }
+  #fire {
+    width: 92px; height: 92px;
+    border-radius: 50%;
+    font-size: 14px;
+    color: #ffd840;
+    border-color: #5a4a20;
+  }
+}
