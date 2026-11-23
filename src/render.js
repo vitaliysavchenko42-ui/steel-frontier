@@ -1,20 +1,22 @@
-// Рендер v2: типизированные враги, бонусы, процедурный пиксель-арт (fix: BULLET в импорте)
+// Рендер v3: естественная палитра, типизированные враги, бонусы
 
-import { GRID, CELL, ARENA, T, DIR, BULLET } from './config.js?v=2';
-import { BASE_CELL } from './level.js?v=2';
+import { GRID, CELL, ARENA, BULLET, T, DIR, BONUS_LIST } from './config.js?v=3';
+import { BASE_CELL } from './level.js?v=3';
 
-const BRICK_A = '#a8552c', BRICK_B = '#8a3b22', MORTAR = '#5a2415';
-const STEEL_L = '#c8ced6', STEEL_M = '#9aa0a8', STEEL_D = '#5f666e';
-const WATER_A = '#1d4e7a', WATER_B = '#2f6ea8';
-const FOREST_A = '#1e4d1e', FOREST_B = '#2f7a2f';
-const FLOOR_A = '#14141a', FLOOR_B = '#17171e';
+const BRICK_A = '#c06a3a', BRICK_B = '#9a4a28', MORTAR = '#6b3020';
+const STEEL_L = '#e4e9ef', STEEL_M = '#a9b2bd', STEEL_D = '#67707e';
+const WATER_A = '#2b6ea8', WATER_B = '#5aa8dc';
+const FOREST_A = '#2e6b2e', FOREST_B = '#57a24a';
+const FLOOR_A = '#3a3a30', FLOOR_B = '#414138';
+const WALL_D = '#3d3d46', WALL_L = '#8f8f99';
 
 const TYPE_COLORS = {
-  basic: { body: '#9a5a40', dark: '#6e3c28', light: '#c07a55', turret: '#d9a06a' },
-  fast:  { body: '#b0a03a', dark: '#7a6d20', light: '#d4c45e', turret: '#e8dd86' },
-  fire:  { body: '#c05030', dark: '#8a3018', light: '#e07a4a', turret: '#f0a070' },
-  armor: { body: '#5a7080', dark: '#3c4c58', light: '#88a0b0', turret: '#b0c4d0' },
-  boss:  { body: '#7a2020', dark: '#4c1212', light: '#b04838', turret: '#e07050' }
+  player: { body: '#5c7a48', dark: '#3f5631', light: '#84ab66', turret: '#a9cd8b' },
+  basic:  { body: '#96683f', dark: '#6b4a2a', light: '#c08e5c', turret: '#dcb083' },
+  fast:   { body: '#b3a13e', dark: '#7f7122', light: '#d8c862', turret: '#ece194' },
+  fire:   { body: '#c25a30', dark: '#8c3c1c', light: '#e88a5c', turret: '#f4b183' },
+  armor:  { body: '#5f7a8a', dark: '#405666', light: '#90aebd', turret: '#b9d0da' },
+  boss:   { body: '#8a2828', dark: '#571616', light: '#c05040', turret: '#e8846c' }
 };
 
 function drawFloorTile(ctx, gx, gy) {
@@ -74,23 +76,23 @@ function drawForestTile(ctx, gx, gy, time) {
 
 function drawWallTile(ctx, gx, gy) {
   const x = gx * CELL, y = gy * CELL;
-  ctx.fillStyle = '#3d3d44';
+  ctx.fillStyle = WALL_D;
   ctx.fillRect(x, y, CELL, CELL);
-  ctx.fillStyle = '#7d7d84';
+  ctx.fillStyle = WALL_L;
   ctx.fillRect(x + 1, y + 1, CELL - 2, CELL - 2);
-  ctx.fillStyle = '#3d3d44';
+  ctx.fillStyle = WALL_D;
   ctx.fillRect(x + 7, y, 2, CELL);
   ctx.fillRect(x, y + 7, CELL, 2);
 }
 
 function drawBase(ctx, time, dead) {
   const x = BASE_CELL[0] * CELL, y = BASE_CELL[1] * CELL, s = 32;
-  ctx.fillStyle = '#241414';
+  ctx.fillStyle = '#2a1c1a';
   ctx.fillRect(x, y, s, s);
-  ctx.fillStyle = '#3a1d1d';
+  ctx.fillStyle = '#442a24';
   ctx.fillRect(x + 2, y + 2, s - 4, s - 4);
   if (dead) {
-    ctx.fillStyle = '#4a2424';
+    ctx.fillStyle = '#5a3a34';
     ctx.fillRect(x + 6, y + 6, s - 12, s - 12);
     return;
   }
@@ -105,17 +107,20 @@ function drawBase(ctx, time, dead) {
   }
   ctx.closePath();
   ctx.fill();
-  const glow = 0.2 + 0.12 * Math.sin(time * 3);
-  ctx.fillStyle = 'rgba(255,110,90,' + glow.toFixed(3) + ')';
+  ctx.strokeStyle = '#e8c840';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  const glow = 0.16 + 0.1 * Math.sin(time * 3);
+  ctx.fillStyle = 'rgba(255,140,110,' + glow.toFixed(3) + ')';
   ctx.fillRect(x, y, s, s);
 }
 
 function drawTank(ctx, t, time) {
   const s = t.size;
   const x = Math.round(t.x), y = Math.round(t.y);
-  let c = TYPE_COLORS[t.type] || TYPE_COLORS.basic;
+  let c = t.role === 'player' ? TYPE_COLORS.player : (TYPE_COLORS[t.type] || TYPE_COLORS.basic);
   const carrier = t.flash && Math.floor(time * 8) % 2 === 0;
-  if (carrier) c = { body: '#d42a2a', dark: '#8a1414', light: '#ff6a5a', turret: '#ffb0a0' };
+  if (carrier) c = { body: '#d43a2a', dark: '#8a1c14', light: '#ff705c', turret: '#ffb8a4' };
   const hw = Math.max(3, Math.round(s * 0.12));
   // гусеницы
   ctx.fillStyle = c.dark;
@@ -144,7 +149,7 @@ function drawTank(ctx, t, time) {
   else ctx.fillRect(x + s - bl - 1, by0, bl, bw);
   // урон у брони
   if (t.role === 'enemy' && t.maxHp > 1 && t.hp < t.maxHp) {
-    ctx.fillStyle = 'rgba(10,10,14,0.35)';
+    ctx.fillStyle = 'rgba(20,16,12,0.35)';
     ctx.fillRect(x + hw - 1, y + hw - 1, s - hw * 2 + 2, s - hw * 2 + 2);
     if (Math.floor(time * 6) % 2 === 0 && t.hitT > 0) {
       ctx.fillStyle = 'rgba(255,255,255,0.5)';
@@ -155,14 +160,14 @@ function drawTank(ctx, t, time) {
   if (t.type === 'boss') {
     ctx.fillStyle = '#2a2a30';
     ctx.fillRect(x - 4, y - 8, s + 8, 4);
-    ctx.fillStyle = '#d42a2a';
+    ctx.fillStyle = '#d43a2a';
     ctx.fillRect(x - 4, y - 8, Math.round((s + 8) * (t.hp / t.maxHp)), 4);
   }
   // щит
   if (t.shield > 0) {
     const blink = t.shield < 0.7 ? (Math.floor(time * 12) % 2 === 0) : true;
     if (blink) {
-      ctx.strokeStyle = '#7ec8ff';
+      ctx.strokeStyle = '#8fd4ff';
       ctx.lineWidth = 2;
       ctx.strokeRect(x - 1.5, y - 1.5, s + 3, s + 3);
     }
@@ -180,9 +185,9 @@ function drawBullet(ctx, b) {
 function drawBonus(ctx, b, time) {
   if (b.ttl < 3 && Math.floor(time * 6) % 2 === 0) return;
   const x = b.x, y = b.y, s = 16;
-  ctx.fillStyle = '#101018';
+  ctx.fillStyle = '#181820';
   ctx.fillRect(x, y, s, s);
-  ctx.strokeStyle = '#cfc6a8';
+  ctx.strokeStyle = '#d8d2be';
   ctx.lineWidth = 1;
   ctx.strokeRect(x + 0.5, y + 0.5, s - 1, s - 1);
   const cx = x + 8, cy = y + 8;
@@ -203,30 +208,30 @@ function drawBonus(ctx, b, time) {
     ctx.closePath(); ctx.fill();
     ctx.fillRect(cx - 6, cy + 2, 12, 2);
   } else if (b.type === 'clock') {
-    ctx.fillStyle = '#e8e2d0';
+    ctx.fillStyle = '#efe9d8';
     ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = '#33333c';
+    ctx.strokeStyle = '#3a3a42';
     ctx.beginPath();
     ctx.moveTo(cx, cy); ctx.lineTo(cx, cy - 4);
     ctx.moveTo(cx, cy); ctx.lineTo(cx + 3, cy);
     ctx.stroke();
   } else if (b.type === 'grenade') {
-    ctx.fillStyle = '#5aa05a';
+    ctx.fillStyle = '#6ab05a';
     ctx.beginPath(); ctx.arc(cx, cy + 1, 5, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#ffd84a';
     ctx.fillRect(cx - 1, cy - 7, 3, 3);
   } else if (b.type === 'shovel') {
-    ctx.fillStyle = '#8a5a2a';
+    ctx.fillStyle = '#9a6630';
     ctx.fillRect(cx - 1, cy - 6, 2, 7);
-    ctx.fillStyle = '#b0b4bc';
+    ctx.fillStyle = '#c2c8d2';
     ctx.beginPath();
     ctx.moveTo(cx - 3, cy + 1); ctx.lineTo(cx + 3, cy + 1); ctx.lineTo(cx, cy + 7);
     ctx.closePath(); ctx.fill();
   } else if (b.type === 'tank') {
-    ctx.fillStyle = '#4a7a3a';
+    ctx.fillStyle = '#5c7a48';
     ctx.fillRect(cx - 6, cy - 3, 12, 7);
     ctx.fillRect(cx - 1, cy - 6, 2, 4);
-    ctx.fillStyle = '#2f5426';
+    ctx.fillStyle = '#3f5631';
     ctx.fillRect(cx - 7, cy + 4, 14, 2);
   }
 }
@@ -263,7 +268,7 @@ export function draw(ctx, game) {
   }
   // заморозка — холодная вуаль
   if (game.freezeT > 0) {
-    ctx.fillStyle = 'rgba(126,200,255,0.10)';
+    ctx.fillStyle = 'rgba(143,212,255,0.10)';
     ctx.fillRect(0, 0, ARENA, ARENA);
   }
 }
