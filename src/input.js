@@ -1,6 +1,6 @@
-// Ввод: клавиатура + сенсор. Выдаёт intent {dir, wantMove, fire}
+// Ввод v4: клавиатура + сенсор. Выдаёт intent {dir, wantMove, fire}
 
-import { DIR } from './config.js?v=2';
+import { DIR } from './config.js?v=4';
 
 export function createInput() {
   const held = [false, false, false, false]; // UP RIGHT DOWN LEFT

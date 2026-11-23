@@ -1,10 +1,10 @@
-// Точка входа v3: меню, цикл 60 Гц, HUD, переходы уровней, диагностика ошибок
+// Точка входа v4: меню, цикл 60 Гц, HUD, переходы уровней, диагностика ошибок
 
-import { ARENA } from './config.js?v=3';
-import { createGame, startLevel, startCampaign, step } from './engine.js?v=3';
-import { draw } from './render.js?v=3';
-import { createInput } from './input.js?v=3';
-import { unlock, setMuted, playEvent } from './sound.js?v=3';
+import { ARENA } from './config.js?v=4';
+import { createGame, startLevel, startCampaign, step } from './engine.js?v=4';
+import { draw } from './render.js?v=4';
+import { createInput } from './input.js?v=4';
+import { unlock, setMuted, playEvent } from './sound.js?v=4';
 import { LAST_CAMPAIGN_LEVEL } from './level.js?v=3';
 
 const canvas = document.getElementById('game');

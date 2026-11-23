@@ -1,4 +1,4 @@
-// Звук v2: WebAudio SFX + короткий мотив победы/поражения
+// Звук v4: WebAudio SFX + короткий мотив победы/поражения
 
 let actx = null;
 let muted = false;
@@ -38,6 +38,7 @@ export function playEvent(ev) {
     case 'shot': beep(940, 0.07, 'square', 0.04); break;
     case 'clank': beep(300, 0.06, 'square', 0.05); break;
     case 'brick': beep(210, 0.09, 'square', 0.06); break;
+    case 'brickhit': beep(180, 0.05, 'square', 0.05); break;
     case 'steelbreak': beep(420, 0.14, 'square', 0.09, 120); break;
     case 'hit': beep(260, 0.1, 'square', 0.07, 180); break;
     case 'boom': beep(170, 0.3, 'sawtooth', 0.12, 45); break;
