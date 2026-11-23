@@ -1,0 +1,15 @@
+{
+ "version": 1,
+ "levels": [
+  {"num":1,"seed":2301,"total":16,"maxOn":3,"interval":3.0,"basic":12,"fast":2,"fire":1,"armor":1,"boss":false,"brick":0.14,"steel":4,"ponds":2,"groves":2},
+  {"num":2,"seed":2302,"total":16,"maxOn":3,"interval":3.0,"basic":10,"fast":3,"fire":2,"armor":1,"boss":false,"brick":0.16,"steel":4,"ponds":2,"groves":2},
+  {"num":3,"seed":2303,"total":18,"maxOn":4,"interval":2.8,"basic":10,"fast":4,"fire":2,"armor":2,"boss":false,"brick":0.18,"steel":5,"ponds":2,"groves":3},
+  {"num":4,"seed":2304,"total":18,"maxOn":4,"interval":2.8,"basic":8,"fast":5,"fire":3,"armor":2,"boss":false,"brick":0.2,"steel":5,"ponds":3,"groves":2},
+  {"num":5,"seed":2305,"total":19,"maxOn":4,"interval":2.7,"basic":8,"fast":4,"fire":3,"armor":3,"boss":true,"brick":0.2,"steel":6,"ponds":2,"groves":2},
+  {"num":6,"seed":2306,"total":20,"maxOn":4,"interval":2.6,"basic":8,"fast":5,"fire":4,"armor":3,"boss":false,"brick":0.22,"steel":6,"ponds":3,"groves":3},
+  {"num":7,"seed":2307,"total":20,"maxOn":4,"interval":2.5,"basic":7,"fast":5,"fire":4,"armor":4,"boss":false,"brick":0.24,"steel":7,"ponds":3,"groves":2},
+  {"num":8,"seed":2308,"total":22,"maxOn":4,"interval":2.4,"basic":7,"fast":6,"fire":4,"armor":5,"boss":false,"brick":0.24,"steel":8,"ponds":3,"groves":3},
+  {"num":9,"seed":2309,"total":22,"maxOn":4,"interval":2.3,"basic":6,"fast":6,"fire":5,"armor":5,"boss":false,"brick":0.26,"steel":8,"ponds":4,"groves":2},
+  {"num":10,"seed":2310,"total":23,"maxOn":4,"interval":2.2,"basic":6,"fast":6,"fire":5,"armor":5,"boss":true,"brick":0.26,"steel":8,"ponds":3,"groves":3}
+ ]
+}

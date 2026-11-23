@@ -2,13 +2,18 @@
 html,body{height:100%;background:#0b0b10;color:#e8e2d0;font-family:'Courier New',monospace;overflow:hidden;touch-action:none}
 #wrap{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
   padding:max(4px,env(safe-area-inset-top)) max(4px,env(safe-area-inset-right)) max(4px,env(safe-area-inset-bottom)) max(4px,env(safe-area-inset-left))}
-#hud{display:flex;gap:18px;font-size:14px;letter-spacing:1px;color:#cfc6a8;flex:0 0 auto;white-space:nowrap}
+#hud{display:flex;gap:16px;font-size:13px;letter-spacing:1px;color:#cfc6a8;flex:0 0 auto;white-space:nowrap}
+#hud-bonus{color:#7ec8ff}
 #stage{position:relative;flex:1 1 auto;display:flex;align-items:center;justify-content:center;min-height:0;width:100%}
 canvas#game{background:#14141a;image-rendering:pixelated;border:2px solid #2c2c34;max-width:100%;max-height:100%}
-#overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:rgba(6,6,10,.8);cursor:pointer}
+#overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:rgba(6,6,10,.82);cursor:pointer}
 #overlay.hidden{display:none}
-#overlay-title{font-size:26px;letter-spacing:4px;color:#ff5b3a;text-shadow:2px 2px 0 #000;text-align:center}
-#overlay-text{font-size:13px;color:#cfc6a8;text-align:center;padding:0 12px}
+#overlay-title{font-size:24px;letter-spacing:4px;color:#ff5b3a;text-shadow:2px 2px 0 #000;text-align:center}
+#overlay-text{font-size:12px;color:#cfc6a8;text-align:center;padding:0 12px;line-height:1.5}
+#menu{display:flex;flex-direction:column;gap:10px}
+#menu.hidden{display:none}
+#menu button{width:220px;padding:12px 0;font-family:inherit;font-size:15px;letter-spacing:2px;color:#e8e2d0;background:#23232e;border:2px solid #3a3a48;border-radius:8px;cursor:pointer}
+#menu button:active{filter:brightness(1.6)}
 #controls{display:none;flex:0 0 auto;width:100%;max-width:560px;padding:0 10px 4px;justify-content:space-between;align-items:flex-end}
 @media (pointer:coarse){#controls{display:flex}}
 #dpad{display:grid;grid-template-columns:56px 56px 56px;grid-template-rows:56px 56px;gap:4px}
