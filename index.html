@@ -3,27 +3,35 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Стальной Рубеж — танковая аркада</title>
-<meta name="description" content="Браузерная танковая аркада с бесконечными уровнями. Собственный код и графика.">
-<link rel="stylesheet" href="css/style.css?v=4">
+<meta name="theme-color" content="#0b0b10">
+<title>Стальной Рубеж</title>
+<link rel="stylesheet" href="css/style.css?v=1">
 </head>
 <body>
-<div id="stage">
-  <canvas id="game" width="448" height="496"></canvas>
-  <div id="touch" aria-hidden="true">
-    <div id="dpad">
-      <button class="tbtn" data-key="ArrowUp"    style="grid-area: u">▲</button>
-      <button class="tbtn" data-key="ArrowLeft"  style="grid-area: l">◀</button>
-      <button class="tbtn" data-key="ArrowRight" style="grid-area: r">▶</button>
-      <button class="tbtn" data-key="ArrowDown"  style="grid-area: d">▼</button>
-    </div>
-    <button id="fire" class="tbtn" data-key="Space">ОГОНЬ</button>
+<div id="wrap">
+  <div id="hud">
+    <span id="hud-level">Ур. 1</span>
+    <span id="hud-enemies">Враги: 5</span>
+    <span id="hud-score">Счёт: 0</span>
+    <span id="hud-lives">Жизни: 3</span>
   </div>
-  <p id="hint">Стрелки/WASD — движение · ПРОБЕЛ — огонь · P — пауза</p>
+  <div id="stage">
+    <canvas id="game" width="416" height="416"></canvas>
+    <div id="overlay">
+      <div id="overlay-title">СТАЛЬНОЙ РУБЕЖ</div>
+      <div id="overlay-text">Коснитесь экрана или нажмите любую клавишу</div>
+    </div>
+  </div>
+  <div id="controls">
+    <div id="dpad">
+      <button class="pad" id="pad-up" data-dir="0">&#9650;</button>
+      <button class="pad" id="pad-left" data-dir="3">&#9664;</button>
+      <button class="pad" id="pad-right" data-dir="1">&#9654;</button>
+      <button class="pad" id="pad-down" data-dir="2">&#9660;</button>
+    </div>
+    <button id="fire">ОГОНЬ</button>
+  </div>
 </div>
-<script src="js/bundle.js?v=19"></script>
-<script src="js/bundle2.js?v=19"></script>
-<script src="js/bundle3.js?v=19"></script>
-<script src="js/bundle3b.js?v=19"></script>
+<script type="module" src="src/main.js?v=1"></script>
 </body>
 </html>
