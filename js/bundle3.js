@@ -55,7 +55,7 @@ ctx.fillStyle = palette.accent;
 ctx.fillRect(-2.5, 1, 5, 4);
 return;
 }
-function drawTank(ctx, cx, cy, dir, style, t){
+function drawTank(ctx, cx, cy, dir, style, t, time){
 const s = TANK;
 const isP = style === 'player';
 const et = isP ? 'basic' : ((t && t.type) || 'basic');
@@ -64,9 +64,10 @@ ctx.translate(cx, cy);
 ctx.rotate(dir * Math.PI / 2);
 ctx.fillStyle = 'rgba(0,0,0,0.22)';
 ctx.fillRect(-s/2 - 1, -s/2 + 5, s + 2, s - 3);
-const paletteRed = { body: '#c03a2e', body2: '#8f241b', tracks: '#1e1e1e', barrel: '#d88a7a', accent: '#5a1410' };
-if (style === 'red') return drawTankCore(ctx, cx, cy, dir, paletteRed, t, false);
-const palette = isP
+const eliteFlash = !isP && t && t.elite && (time !== undefined) && (Math.sin(time * 14) > 0);
+const palette = eliteFlash
+? { body: '#d8d8d8', body2: '#aaaaaa', tracks: '#3a3a3a', barrel: '#f2f2f2', accent: '#808080' }
+: isP
 ? { body: '#4d7a3a', body2: '#3a5c2b', tracks: '#2b2b2b', barrel: '#8a8a8a', accent: '#c8b06a' }
 : et === 'fast' ? { body: '#49c2d4', body2: '#2a8fa0', tracks: '#1e1e1e', barrel: '#c8f2f8', accent: '#0e5a66' }
 : et === 'sniper' ? { body: '#d4b13a', body2: '#a3851f', tracks: '#1e1e1e', barrel: '#8a7a3a', accent: '#5a4810' }
@@ -98,8 +99,8 @@ ctx.fillStyle = palette.body;
 roundRect(ctx, -5.5, -5.5, 11, 11, 3.5); ctx.fill();
 if (et === 'fast'){
 const hpStage = (t && t.hp !== undefined) ? t.hp : 3;
-if (hpStage <= 1){ palette.body = '#8d8d8d'; palette.body2 = '#6f6f6f'; palette.accent = '#4a4a4a'; }
-else if (hpStage === 2){ palette.body = '#d4b13a'; palette.body2 = '#a3851f'; palette.accent = '#5a4810'; }
+if (!eliteFlash && hpStage <= 1){ palette.body = '#8d8d8d'; palette.body2 = '#6f6f6f'; palette.accent = '#4a4a4a'; }
+else if (!eliteFlash && hpStage === 2){ palette.body = '#d4b13a'; palette.body2 = '#a3851f'; palette.accent = '#5a4810'; }
 ctx.fillStyle = palette.body;
 ctx.fillRect(-s/2 + 7, -s/2 + 3, s - 14, s - 6);
 ctx.fillStyle = palette.body2;
@@ -123,8 +124,8 @@ ctx.strokeStyle = palette.accent; ctx.lineWidth = 1.2;
 ctx.beginPath(); ctx.moveTo(-4, -3); ctx.lineTo(-7, -s/2 + 4); ctx.stroke();
 } else if (et === 'armor'){
 const hpStage = (t && t.hp !== undefined) ? t.hp : 3;
-if (hpStage <= 1){ palette.body = '#8d8d8d'; palette.body2 = '#6f6f6f'; palette.accent = '#4a4a4a'; }
-else if (hpStage === 2){ palette.body = '#d4b13a'; palette.body2 = '#a3851f'; palette.accent = '#5a4810'; }
+if (!eliteFlash && hpStage <= 1){ palette.body = '#8d8d8d'; palette.body2 = '#6f6f6f'; palette.accent = '#4a4a4a'; }
+else if (!eliteFlash && hpStage === 2){ palette.body = '#d4b13a'; palette.body2 = '#a3851f'; palette.accent = '#5a4810'; }
 ctx.fillStyle = '#101010';
 ctx.fillRect(-s/2 - 2, -s/2 + 1, 9, s - 2);
 ctx.fillRect(s/2 - 7, -s/2 + 1, 9, s - 2);
@@ -515,7 +516,7 @@ for (let i = 0; i < 5; i++){ ctx.beginPath(); ctx.arc(fx + 8 + i * 4, fy + 24 + 
 for (const t of game.engine.tanks){
 if (!t.alive) continue;
 drawTank(ctx, OFF_X + t.x + TANK/2, OFF_Y + t.y + TANK/2, t.dir,
-t.isPlayer ? 'player' : (t.elite ? (Math.sin(time * 14) > 0 ? 'red' : (t.type === 'armor' && Math.sin(time * 12) > 0 ? 'gold' : ENEMY_COLOR[t.type] || 'grey')) : (ENEMY_COLOR[t.type] || 'grey')), t);
+t.isPlayer ? 'player' : (ENEMY_COLOR[t.type] || 'grey'), t, time);
 if (t.spawnFlash > 0){
 const a = 0.35 + 0.4 * (0.5 + 0.5 * Math.sin(time * 16));
 drawSpawnStar(ctx, OFF_X + t.x + TANK/2, OFF_Y + t.y + TANK/2, 11 + 3 * Math.sin(time * 12), a);
