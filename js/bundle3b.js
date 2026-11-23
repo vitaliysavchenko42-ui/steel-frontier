@@ -169,7 +169,7 @@ window.addEventListener('keyup', (e) => keys.delete(e.code));
 const touchState = {};
 document.querySelectorAll('.tbtn').forEach(btn => {
 const key = btn.dataset.key;
-const on = (e) => { e.preventDefault(); touchState[key] = true; keys.add(key); ui.onKey(key, true); if (key === 'Space') ui.onKey('TouchStart', true); if (sfx.resume) sfx.resume(); };
+const on = (e) => { e.preventDefault(); touchState[key] = true; keys.add(key); if (key === 'Space') ui.onKey('TouchStart', true); else ui.onKey(key, true); if (sfx.resume) sfx.resume(); };
 const off = (e) => { e.preventDefault(); touchState[key] = false; keys.delete(key); };
 btn.addEventListener('touchstart', on, { passive: false });
 btn.addEventListener('touchend', off, { passive: false });
