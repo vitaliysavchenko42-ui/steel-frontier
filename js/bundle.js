@@ -21,7 +21,7 @@ sniper: { hp:1, speed:40, bulletSpeed:210, fire:2.2, score:300, color:'gold' },
 armor: { hp:3, speed:30, bulletSpeed:120, fire:1.6, score:400, color:'green' },
 };
 function enemyBudget(level){
-const total = 20 + Math.floor((level-1)/2);
+const total = 20; // общий пул на уровне фиксирован, растут скорость и рождаемость
 const maxOn = 3; // на поле всегда ровно три врага
 let pArmor = Math.min(0.35, 0.04 + (level-1)*0.03);
 let pSniper = Math.min(0.25, (level-1)*0.02);
@@ -50,7 +50,7 @@ let a = seed >>> 0;
 return function(){
 a |= 0; a = (a + 0x6D2B79F5) | 0;
 let t = Math.imul(a ^ (a >>> 15), 1 | a);
-t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+t = Math.imul(t ^ (t >>> 7), 61 | t);
 return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 };
 }
